@@ -6,6 +6,6 @@ library(readr)
 library(skimr)
 library(dplyr)
 
-framingham <- read.csv("training_data.csv")
+framingham <- as_tibble(read.csv("training_data.csv"))
 
 
