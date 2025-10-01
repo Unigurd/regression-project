@@ -17,14 +17,14 @@ all(arrange(framingham[,c("RANDID","AGE")]) == framingham[,c("RANDID","AGE")])
 # We use this knowledge to add the following columns:
 # - age_diff shows how much each person has aged since their first checkup.
 # - checkup shows which checkup number the row is.
-# - observed_for shows how many years of observation are left until the censoring date.
+# - years_till_censoring shows how many years of observation are left until the censoring date.
 # We also drop X since it just counts rows.
 fram_checkup <- mutate(
     framingham,
     age_diff=AGE-AGE[1],
     # Choices for cutoffs are argued below.
     checkup=ifelse(age_diff == 0, 1, ifelse(age_diff < 10, 2, 3)),
-    observed_for=24-age_diff,
+    years_till_censoring=24-age_diff,
     X=NULL,
     .by=RANDID,
     .after=RANDID
