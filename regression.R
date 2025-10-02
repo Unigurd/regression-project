@@ -211,9 +211,13 @@ ggally_hexbin <- function(data, mapping, ...) {
 # We see that SYSBP and DIABP are the most correlated with a Corr score of 0.722.
 # We see a single outlier for HEARTRTE, four for TOTCHOL, maybe some for SYSBP?
 # So we should maybe pick DIABP over it?
+# CIGPDAY and educ are very skewed, as are most of the binary factors.
+# Should we make groupings for CIGPDAY?
+# Should we make groupings for time_to_censor? four of them?
 GGally::ggpairs(
             framingham,
-            columns = c("AGE", "time_to_censor", "TOTCHOL", "SYSBP", "DIABP", "CIGPDAY", "BMI", "HEARTRTE", "GLUCOSE"),
+            columns = c("AGE", "time_to_censor", "TOTCHOL", "SYSBP",
+                        "DIABP", "CIGPDAY", "BMI", "HEARTRTE", "GLUCOSE"),
             lower   = list(continuous = GGally::wrap("hexbin", bins=20)),
             diag = list(continuous = "blankDiag")
         )
