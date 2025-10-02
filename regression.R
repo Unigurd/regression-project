@@ -166,11 +166,18 @@ framingham <- framingham_all |>
 # throw all that away.
 table(framingham_all$PERIOD)
 
+
+# Issues to look out for:
+# - Extreme observations and potential outliers
+# - Missing values
+# - Skewness or asymmetry of marginal distributions
+# - collinearity of predictors
+
 fill = gray(0.7)
 
 # Plot the marginal distribution of a column
 marginal_plot <- function(col) {
-    if (is.factor(framingham[[col]]) | col == "CVD") {
+    if (is.factor(framingham[[col]]) | col == "CVD" | col == "CIGPDAY") {
         plot <- ggplot(data=framingham) +
             aes_string(col) +
             xlab(col) +
