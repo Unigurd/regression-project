@@ -54,6 +54,30 @@ framingham_all <- mutate(
     X=NULL,
 )
 
+framingham <- select(
+    framingham_all,
+    CVD,
+    AGE,
+    SEX,
+    educ,
+    days_till_censoring,
+    TOTCHOL,
+    SYSBP,
+    DIABP,
+    BPMEDS,
+    CURSMOKE,
+    CIGPDAY,
+    BMI,
+    HEARTRTE,
+    GLUCOSE,
+    DIABETES,
+    PREVCHD,
+    PREVAP,
+    PREVMI,
+    PREVSTRK,
+    PREVHYP
+)
+
 # The following expression tells us that over half of the observations
 # are in the second and third checkups, so it would be a shame to have to
 # throw all that away.
