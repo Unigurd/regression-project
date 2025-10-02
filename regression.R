@@ -136,13 +136,6 @@ framingham_all <- framingham_raw |>
     subset(select=-c(max, timeap, timemi, timemifc, timechd, timestrk, timecvd, timehyp))
 
 
-## We use this knowledge to add the column days_till_censoring which shows
-## how many years of observation are left until the censoring date. This is
-## based on some loose estimate of the censoring date being after 24 years.
-## We also drop X since it just counts rows and reencode a bunch of columns
-## as factors. Not CVD though since it's our response and so it has to be
-## numeric if we want to fit regular lms on it.
-
 # We can now remove all observations that occur after the CVD event happened and all observations
 # where the person was never seen again. We also remove all columns that we don't want as predictors.
 framingham <- framingham_all |>
