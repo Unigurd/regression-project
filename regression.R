@@ -6,6 +6,7 @@ library(readr)
 library(skimr)
 library(dplyr)
 library(rlang)
+library(hexbin)
 
 set.seed(8088)
 framingham_raw <- read.csv("training_data.csv") |>
@@ -222,4 +223,19 @@ GGally::ggpairs(
             diag = list(continuous = "blankDiag")
         )
 
+
+cp <- cor(
+    data.matrix(framingham),
+    use    = "complete.obs",
+    method = "spearman"
+)
+corrplot::corrplot(
+              cp,
+              diag    = FALSE,
+              order   = "hclust",
+              addrect = 14,
+              tl.srt  = 45,
+              tl.col  = "black",
+              tl.cex  = 0.8
+          )
 
