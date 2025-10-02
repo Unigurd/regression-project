@@ -154,5 +154,19 @@ marginal_plot <- function(col) {
 tmp <- lapply(names(framingham), marginal_plot)
 do.call(gridExtra::grid.arrange, c(tmp, ncol=5))
 
+
+# Taken from the book chapter 3
+ggally_hexbin <- function(data, mapping, ...) {
+    ggplot(data, mapping) + stat_binhex(...)
+}
+
+
+GGally::ggpairs(
+            framingham,
+            columns = c("AGE", "days_till_censoring", "TOTCHOL", "SYSBP", "DIABP", "CIGPDAY", "BMI", "HEARTRTE", "GLUCOSE"),
+            lower   = list(continuous = GGally::wrap("hexbin", bins=20)),
+            diag = list(continuous = "blankDiag")
+        )
+
 skim(framingham)
 
