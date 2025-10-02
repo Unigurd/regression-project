@@ -239,3 +239,21 @@ corrplot::corrplot(
               tl.cex  = 0.8
           )
 
+
+# Plot the density of variables when cvd == 0 and when cvd == 1
+plot_density_cvd <- function(col, data=framingham) {
+    ggplot(data) +
+        facet_grid(. ~ CVD, label=label_both) +
+        aes_string(col) +
+        geom_density(fill=fill)
+}
+
+numeric_names <- names(framingham)[!sapply(framingham, is.factor) &
+                                   names(framingham) != "CVD"]
+
+# Interestingly, the time_to_censor is more spread out
+# for the cases where the person did get CVD. People
+# who get CVD are more likely to go no-contact with the
+# study? Do they die?
+do.call(gridExtra::grid.arrange, c(lapply(numeric_names, plot_density_cvd), ncol=3))
+
