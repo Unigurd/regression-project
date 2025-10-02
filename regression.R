@@ -8,16 +8,16 @@ library(dplyr)
 library(rlang)
 
 set.seed(8088)
-framingham_ <- as_tibble(read.csv("training_data.csv"))
+framingham_raw <- as_tibble(read.csv("training_data.csv"))
 
 
 # Framingham is ordered so that lower RANDIDs come first, and when there are
 # multiple rows for the same RANDID, the earlier checkups come first.
 # This is evidenced by the below check.
-all(arrange(framingham_[,c("RANDID","TIME")]) == framingham_[,c("RANDID","TIME")])
+all(arrange(framingham_raw[,c("RANDID","TIME")]) == framingham_raw[,c("RANDID","TIME")])
 
 # Thankfully noone attended more than three examinations.
-max(table(framingham_[,"RANDID"]))
+max(table(framingham_raw[,"RANDID"]))
 
 
 # We use this knowledge to add the column days_till_censoring which shows
@@ -26,8 +26,8 @@ max(table(framingham_[,"RANDID"]))
 # We also drop X since it just counts rows and reencode a bunch of columns
 # as factors. Not CVD though since it's our response and so it has to be
 # numeric if we want to fit regular lms on it.
-framingham <- mutate(
-    framingham_,
+framingham_all <- mutate(
+    framingham_raw,
     SEX      = factor(SEX,      ordered=TRUE),
     CURSMOKE = factor(CURSMOKE, ordered=TRUE),
     DIABETES = factor(DIABETES, ordered=TRUE),
@@ -57,7 +57,7 @@ framingham <- mutate(
 # The following expression tells us that over half of the observations
 # are in the second and third checkups, so it would be a shame to have to
 # throw all that away.
-table(framingham$PERIOD)
+table(framingham_all$PERIOD)
 
 
 # A list of the correspondences between the times of events
@@ -80,7 +80,7 @@ fill = gray(0.7)
 # One where the indicator is zero and one where it is one.
 timeplot <- function(col) {
     indicator <- timecols[[col]]
-    ggplot(framingham) +
+    ggplot(framingham_all) +
         facet_grid(expr(. ~ !!sym(indicator)), label=label_both) +
         aes_string(col) +
         geom_density(fill=fill)
@@ -99,7 +99,7 @@ do.call(gridExtra::grid.arrange, c(lapply(names(timecols), timeplot), ncol=4))
 # where some event happened. The parameter col is supposed to
 # be the column containing the times to the event, not the indicator
 # of the event. E.g. TIMEAP, not ANGINA.
-timefilter <- function(col, data=framingham, indicator_value=1) {
+timefilter <- function(col, data=framingham_all, indicator_value=1) {
     indicator <- timecols[[col]]
     filter(data, data[[indicator]] == indicator_value)
 }
