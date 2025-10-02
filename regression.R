@@ -83,50 +83,7 @@ framingham <- select(
 # throw all that away.
 table(framingham_all$PERIOD)
 
-
-# A list of the correspondences between the times of events
-# and the indicators of those events.
-timecols <- list(
-    TIMEAP   = "ANGINA",
-    TIMEMI   = "HOSPMI",
-    TIMEMIFC = "MI_FCHD",
-    TIMECHD  = "ANYCHD",
-    TIMESTRK = "STROKE",
-    TIMECVD  = "CVD",
-    TIMEDTH  = "DEATH",
-    TIMEHYP  = "HYPERTEN"
-)
-
 fill = gray(0.7)
-
-# For a column giving the time of occurrence of some event,
-# create two plot showing the density of those times.
-# One where the indicator is zero and one where it is one.
-timeplot <- function(col) {
-    indicator <- timecols[[col]]
-    ggplot(framingham_all) +
-        facet_grid(expr(. ~ !!sym(indicator)), label=label_both) +
-        aes_string(col) +
-        geom_density(fill=fill)
-}
-
-# Create such plots for all the time-to-event columns.
-# We see that the distribution are quite different,
-# in particular the extremely heavy tail. If the event didn't occur,
-# the last moment of contact is registered in the time-to-event column
-# instead. So we have to filter the rows out where the event
-# didn't occur when making plots of these columns if they are to
-# make any sense.
-do.call(gridExtra::grid.arrange, c(lapply(names(timecols), timeplot), ncol=4))
-
-# Filter the data such that it only contains the rows
-# where some event happened. The parameter col is supposed to
-# be the column containing the times to the event, not the indicator
-# of the event. E.g. TIMEAP, not ANGINA.
-timefilter <- function(col, data=framingham_all, indicator_value=1) {
-    indicator <- timecols[[col]]
-    filter(data, data[[indicator]] == indicator_value)
-}
 
 # Plot the marginal distribution of a column
 marginal_plot <- function(col) {
