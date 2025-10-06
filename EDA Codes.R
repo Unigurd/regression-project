@@ -1,24 +1,24 @@
 ### Install & load packages
-# Run install.packages(...) 
+# Run install.packages(...)
 install.packages(c("riskCommunicator", "tidyverse", "data.table",
                    "summarytools", "GGally", "naniar", "tableone",
                    "corrplot", "scales", "survival", "survminer", "mice"))
 # Load libraries
-library(riskCommunicator)  
+library(riskCommunicator)
 library(tidyverse)
 library(data.table)
-library(summarytools)  
-library(GGally)        
-library(naniar)        
-library(tableone)      
+library(summarytools)
+library(GGally)
+library(naniar)
+library(tableone)
 library(corrplot)
 library(scales)
 library(survival)
 library(survminer)
-library(mice)          
+library(mice)
 
 # #Set seed and create output folder (if not exists)
-set.seed(2025)                 
+set.seed(2025)
 dir.create("output", showWarnings = FALSE)
 
 ### Load framingham data
@@ -168,4 +168,3 @@ fit_km <- survfit(surv_obj ~ DIABETES, data = df)
 ggsurvplot(fit_km, data = df, conf.int = TRUE, pval = TRUE,
            risk.table = TRUE, ggtheme = theme_minimal(),
            legend.title="Diabetes status")
-
