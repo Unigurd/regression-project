@@ -66,12 +66,13 @@ cor(data$HDLC, data$LDLC, use = "complete.obs") # low cor (-0.12). If we decide 
 
 # list of plausible predictors
 predictors <- c("SEX", "AGE", "educ", "TOTCHOL", "SYSBP", "CIGPDAY", "BMI", "DIABETES", "BPMEDS", "HEARTRTE", "GLUCOSE",
-                "PREVCHD", "PREVAP", "PREVMI", "PREVSTRK", "PREVHYP")
+                "PREVCHD", "PREVAP", "PREVMI", "PREVHYP")
 all_vars <- c("CVD", predictors)
 # does not include: 
 # indicators that show indication of diseases during follow up (these are no predictors!)
 # Time variables
 # DIABP because we have SYSBP, CURSMOKE because we have CIGPDAY, HDLC & LDLC because they only appear in period 3
+# stroke because there is so little people with strokes
 
 # check again for correlations between included predictors (multicollinearity)
 # Make a numeric matrix for correlation (convert factors to numeric if necessary)
@@ -107,5 +108,5 @@ cor(corr_data$CVD, corr_data$PREVCHD)
 # as well as between PREVHYP and SYSBP
 cor(corr_data$PREVHYP, corr_data$SYSBP) # 0.67
 
-
+table(data$PREVSTRK)
 
