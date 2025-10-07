@@ -178,11 +178,7 @@ marginal_plot <- function(col) {
             ylab("") +
             geom_bar(fill=fill)
     } else {
-        if (is.null(timecols[[col]])) {
-            data <- framingham
-        } else {
-            data <- timefilter(col)
-        }
+        data <- framingham
         plot <- ggplot(data=data) +
             aes_string(col) +
             xlab(col) +
