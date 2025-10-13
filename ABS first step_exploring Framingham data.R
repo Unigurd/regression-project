@@ -408,3 +408,174 @@ cont_predictors <- c("AGE", "TOTCHOL", "SYSBP", "DIABP", "BMI",
 #  Visualisering - Korrelationsmatrix
 # ---------------------------------------------------------------------------
 
+
+
+
+#############################################################################################################################
+
+#==================================================
+# Alternativ udgangspunkt: Period 1 (aka. Baseline)
+#==================================================
+
+                  #### Struktur: ####
+
+# 1. Marginal distributions
+# 2. Missing values
+# 3. Selection of potential predictors
+# 4. Pairwise associations
+# 5. Marginal associations with response
+
+# Libraries
+library(riskCommunicator)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(knitr)
+
+data(framingham, package = "riskCommunicator")
+
+#################### Data_structur ####################
+
+# Hurtig gennemgang:
+#______________________
+
+dim(framingham) # nrow =  11,627. &  ncol = 39
+
+# Purpose: Simplify analysis by using only first observation per person
+
+framingham_baseline <- framingham %>% 
+  filter(PERIOD == 1)     # Period 1 -> Can be examinated.
+dim(framingham_baseline)   # 4434   39
+
+framingham_Period_2 <- framingham %>%
+  filter(PERIOD == 2)
+dim(framingham_Period_2)  # 3930   39
+
+framingham_Period_3 <- framingham %>%
+  filter(PERIOD == 3) 
+dim(framingham_Period_3) # 3263   39
+
+# Check baseline dataset dimensions
+dim(framingham_baseline)
+# Result: Fewer rows now - only one per participant
+
+#  SELECT KEY VARIABLES FOR INITIAL ANALYSIS ----
+# Purpose: Focus on most clinically relevant predictors and outcomes
+selected_vars <- framingham_baseline %>%
+  select(
+    # Demographic
+    SEX, AGE,
+    # Cholesterol
+    TOTCHOL,
+    # Blood Pressure
+    SYSBP, DIABP, BPMEDS,
+    # Lifestyle
+    CURSMOKE, CIGPDAY, BMI,
+    # Metabolic
+    DIABETES, GLUCOSE,
+    # Medical History
+    PREVHYP,
+    # Outcomes (will choose one as primary response later)
+    CVD, ANYCHD, DEATH, HYPERTEN
+  )
+
+#  EXAMINE CONTINUOUS VARIABLES ----
+# Purpose: Understand distribution, central tendency, spread, outliers
+
+continuous_vars <- c("AGE", "TOTCHOL", "SYSBP", "DIABP", "BMI", "GLUCOSE")
+
+#  Summary statistics for continuous variables
+continuous_summary <- selected_vars %>%
+  select(all_of(continuous_vars)) %>%
+  summary()
+print(continuous_summary)
+
+#  Visualize distributions with histograms
+par(mfrow = c(2, 3))  # Create 2x3 plot grid
+
+for (var in continuous_vars) {
+  hist(selected_vars[[var]], 
+       main = paste("Distribution of", var),
+       xlab = var,
+       col = "lightblue",
+       breaks = 20)
+}
+
+# Reset plot layout
+par(mfrow = c(1, 1))
+
+#  Check for outliers with boxplots
+ggplot(gather(selected_vars %>% select(all_of(continuous_vars)), 
+              key = "variable", value = "value"), 
+       aes(x = variable, y = value)) +
+  geom_boxplot(fill = "lightgreen") +
+  theme_minimal() +
+  labs(title = "Boxplots of Continuous Variables",
+       x = "Variable",
+       y = "Value") +
+  coord_flip()  # Flip for better readability
+
+# EXAMINE CATEGORICAL VARIABLES ----
+# Purpose: Understand frequency distributions of categorical/binary variables
+
+categorical_vars <- c("SEX", "CURSMOKE", "DIABETES", "BPMEDS", "PREVHYP")
+
+# Frequency tables for categorical variables
+cat_freq_tables <- list()
+
+for (var in categorical_vars) {
+  cat_freq_tables[[var]] <- table(selected_vars[[var]])
+  print(paste("Frequency table for", var, ":"))
+  print(cat_freq_tables[[var]])
+}
+
+#  Visualize categorical distributions with bar plots
+par(mfrow = c(2, 3))
+
+for (var in categorical_vars) {
+  freq_table <- table(selected_vars[[var]])
+  barplot(freq_table,
+          main = paste("Distribution of", var),
+          xlab = var,
+          ylab = "Frequency",
+          col = "lightcoral")
+}
+
+par(mfrow = c(1, 1))
+
+# . EXAMINE POTENTIAL RESPONSE VARIABLES ----
+# Purpose: Understand the outcomes we might want to predict
+
+response_vars <- c("CVD", "ANYCHD", "DEATH", "HYPERTEN")
+
+# 5.1 Frequency of outcomes in baseline data
+response_freq <- list()
+
+for (var in response_vars) {
+  response_freq[[var]] <- table(selected_vars[[var]])
+  print(paste("Prevalence of", var, "at baseline:"))
+  print(round(prop.table(response_freq[[var]]) * 100, 1))
+
+}
+
+# . DATA QUALITY CHECK ----
+# Purpose: Identify any obvious data quality issues
+
+# Check for impossible values
+
+range(selected_vars$AGE, na.rm = TRUE)
+cat("SYSBP range:", range(selected_vars$SYSBP, na.rm = TRUE)
+range(selected_vars$BMI, na.rm = TRUE)
+
+# Check CIGPDAY when CURSMOKE = 0
+
+selected_vars %>%
+  filter(CURSMOKE == 0) %>%
+  summarise(
+    n = n(),
+    cigpday_zero = sum(CIGPDAY == 0, na.rm = TRUE),
+    cigpday_nonzero = sum(CIGPDAY > 0, na.rm = TRUE)
+  )
+# ==========================================================================
+
+
