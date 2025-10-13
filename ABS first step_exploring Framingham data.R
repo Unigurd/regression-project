@@ -1,0 +1,410 @@
+###########################################################
+#                 framingham data
+###########################################################
+#          - DEL 1: (EDA) EKSPLORATIV DATAANALYSE
+# ___________________________________________________________
+# Formål: Systematisk eksplorere datasættet før modellering
+# Følger opgavens struktur:
+# 1. Marginal distributions
+# 2. Missing values
+# 3. Selection of potential predictors
+# 4. Pairwise associations
+# 5. Marginal associations with response
+# ___________________________________________________________
+
+
+library(riskCommunicator) # Framingham data
+library(dplyr)   # For at manipulere data (data_mamipulation)
+library(ggplot2)   # Visualisering & plots.
+library(tidyr)   # Data reshaping
+library(Hmisc)  # Korrelation w. p-valus ()
+library(corrplot)   # Korrelationsmatrix plots
+library(psych)   # Deskriptiv statistik 
+library(naniar)     # Missing data visualisering
+library(GGally)     # Pairwise plots
+library(RwR)    # For bike dataset
+library(ggplot2)    # For plotting
+library(broom)   # For tidy model output
+library(dplyr)      # For data manipulation
+library(MASS)
+library(splines)    # For spline models
+#install.packages("GGally")
+# Load data
+data(framingham, package = "riskCommunicator")
+
+# Grundlæggende info
+dim(framingham)            # Dimensioner: rækker x kolonner
+str(framingham)            # Struktur: datatyper
+head(framingham, 10)       # Første 10 rækker
+
+# ============================================================================
+# MARGINAL DISTRIBUTIONS OF VARIABLES INCLUDED
+# ==================   ==========================================================
+
+# --------------------------------------------------------------------------------------
+#  Identificer variabeltyper
+# ----------------------------------------------------------------------------
+framingham
+# Kontinuerte prædiktorer
+continuous_vars <- c("AGE", "TOTCHOL", "SYSBP", "DIABP", "CIGPDAY", 
+                     "BMI", "HEARTRTE", "GLUCOSE", "HDLC", "LDLC")
+
+# Binære/kategoriske prædiktorer
+binary_vars <- c("SEX", "CURSMOKE", "DIABETES", "BPMEDS", "CVD", "DEATH",
+                 "PREVCHD", "PREVAP", "PREVMI", "PREVSTRK", "PREVHYP",
+                 "ANGINA", "HOSPMI", "MI_FCHD", "ANYCHD", "STROKE", "HYPERTEN")
+
+# Ordinal variabel
+ordinal_vars <- c("educ")
+
+# Study design variable
+design_vars <- c("RANDID", "PERIOD", "TIME")
+
+# Time-to-event variable
+time_vars <- c("TIMECVD", "TIMEDTH", "TIMEMI", "TIMEMIFC", "TIMECHD", 
+               "TIMESTRK", "TIMEAP", "TIMEHYP")
+
+# ----------------------------------------------------------------------------
+# Deskriptiv statistik - Kontinuerte variable
+# ---------------------------------------------------------------------------------..-
+
+# Detaljeret deskriptiv statistik
+desc_continuous <- describe(framingham[continuous_vars])
+print(desc_continuous)
+
+# Summary statistik (base R)
+summary(framingham[continuous_vars])
+
+# Lav egen tabel med nøgletal (se om det giver bedre mening -> kunne være interessant, hvis vi så et mønstre og fokuserede på det)
+desc_table <- framingham %>%
+  select(all_of(continuous_vars)) %>%
+  summarise(across(everything(), list(
+    n = ~sum(!is.na(.)),                    # Antal ikke-missing
+    mean = ~mean(., na.rm = TRUE),          # Gennemsnit
+    sd = ~sd(., na.rm = TRUE),              # Standardafvigelse
+    min = ~min(., na.rm = TRUE),            # Minimum
+    q25 = ~quantile(., 0.25, na.rm = TRUE), # 1. kvartil
+    median = ~median(., na.rm = TRUE),      # Median
+    q75 = ~quantile(., 0.75, na.rm = TRUE), # 3. kvartil
+    max = ~max(., na.rm = TRUE),            # Maximum
+    missing = ~sum(is.na(.))                # Antal missing
+  ))) %>%
+  pivot_longer(everything()) %>%
+  separate(name, into = c("Variable", "Statistic"), sep = "_(?=[^_]+$)") %>%
+  pivot_wider(names_from = Statistic, values_from = value)
+
+print(desc_table)
+
+# ---------.- .----------------------------------------------------------__---_---------
+#  Visualisering - Histogrammer for kontinuerte variable
+# ---------  -------------------------------------------------------------------____----
+
+# Histogrammer i facets
+fig1_histograms <- framingham %>%
+  select(all_of(continuous_vars)) %>%
+  pivot_longer(everything(), names_to = "Variable", values_to = "Value") %>%
+  ggplot(aes(x = Value)) +
+  geom_histogram(bins = 30, fill = "steelblue", alpha = 0.7, color = "black") +
+  facet_wrap(~ Variable, scales = "free", ncol = 3) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 14, face = "bold"),
+    strip.text = element_text(size = 10, face = "bold")
+  ) +
+  labs(
+    title = "Figur 1: Marginalfordelinger - Kontinuerte Variable",
+    subtitle = "Alle observationer (n=11,627)",
+    x = "Værdi",
+    y = "Frekvens"
+  )
+
+print(fig1_histograms)
+
+
+# ----------------------------------------------------------------------------
+#  Q-Q plots for normalitetscheck
+# ----------------------------------------------------------------------------
+
+# Q-Q plots for at vurdere normalfordeling
+par(mfrow = c(3, 4), mar = c(4, 4, 2, 1))
+for (var in continuous_vars) {
+  qqnorm(framingham[[var]], main = var, cex.main = 1)
+  qqline(framingham[[var]], col = "red", lwd = 2)
+}
+par(mfrow = c(1, 1))
+
+# ----------------------------------------------------------------------------
+#  Deskriptiv statistik - Binære/kategoriske variable
+# ----------------------------------------------------------------------------
+
+# Frekvens---tabeller for alle binære variable
+freq_tables <- lapply(framingham[binary_vars], function(x) {
+  tab <- table(x, useNA = "ifany")
+  prop <- prop.table(tab) * 100
+  data.frame(
+    Value = names(tab),
+    N = as.numeric(tab),
+    Percent = as.numeric(prop)
+  )
+})
+
+#
+print(freq_tables$SEX)
+
+print(freq_tables$CVD)
+
+
+print(freq_tables$DIABETES)
+
+# Samlet tabel for binære variable ( ---- ----- 0,1,0,1,0k,1,10,1,) 
+
+binary_summary <- framingham %>%
+  select(all_of(binary_vars)) %>%
+  summarise(across(everything(), list(
+    n_total = ~sum(!is.na(.)),
+    n_0 = ~sum(. == 0, na.rm = TRUE),
+    n_1 = ~sum(. == 1, na.rm = TRUE),
+    n_2 = ~sum(. == 2, na.rm = TRUE),  # For SEX
+    pct_1 = ~mean(. == 1, na.rm = TRUE) * 100
+  ))) %>%
+  pivot_longer(everything()) %>%
+  separate(name, into = c( ,  ), sep = ) %>%
+  pivot_wider(names_from = Statistic, values_from = value)
+
+print(binary_summary)
+
+# ----------------------------------------------------------------------------
+#  Ordinal variabel: educ
+# ----------------------------------------------------------------------------
+
+# Education level (1-4)
+educ_freq <- table(framingham$educ, useNA = "ifany")
+educ_prop <- prop.table(educ_freq) * 100
+
+print(data.frame(
+  Level = names(educ_freq),
+  N = as.numeric(educ_freq),
+  Percent = as.numeric(educ_prop)
+))
+
+# Barplot
+barplot(educ_freq, 
+        main = "Figur 2: Uddannelsesniveau (educ)",
+        xlab = "Education Level",
+        ylab = "Frekvens",
+        col = "steelblue")
+
+# ----------------------------------------------------------------------------
+# Study design variable: PERIOD og TIME
+# ----------------------------------------------------------------------------
+
+# PERIOD fordeling
+table(framingham$PERIOD)
+
+# Antal målinger per person
+measurements_per_person <- framingham %>%
+  group_by(RANDID) %>%
+  summarise(n_measurements = n()) %>%
+  count(n_measurements, name = "n_persons")
+
+print("Antal målinger per person:")
+print(measurements_per_person)
+
+# TIME statistik per PERIOD
+time_by_period <- framingham %>%
+  group_by(PERIOD) %>%
+  summarise(
+    n = n(),
+    mean_TIME = mean(TIME),
+    sd_TIME = sd(TIME),
+    min_TIME = min(TIME),
+    max_TIME = max(TIME),
+    mean_AGE = mean(AGE, na.rm = TRUE)
+  )
+
+print("TIME statistik per PERIOD:")
+print(time_by_period)
+
+# ============================================================================
+# . MISSING VALUES
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# Samlet missing values analyse
+# ----------------------------------------------------------------------------
+
+# Beregn missing for ALLE variable
+missing_summary <- framingham %>%
+  summarise(across(everything(), ~sum(is.na(.) | . == "NA" | . == ""))) %>%
+  pivot_longer(everything(), names_to = "Variable", values_to = "N_Missing") %>%
+  mutate(
+    N_Total = nrow(framingham),
+    Pct_Missing = round(N_Missing / N_Total * 100, 2)
+  ) %>%
+  arrange(desc(Pct_Missing)) %>%
+  filter(N_Missing > 0)  # Vis kun variable med missing
+
+print(missing_summary, n = 30)
+
+# ----------------------------------------------------------------------------
+#  Missing patterns visualisering
+# ----------------------------------------------------------------------------
+
+# Vis missing per variabel (barplot)
+fig3_missing_bar <- gg_miss_var(framingham) +
+  theme_minimal() +
+  labs(
+    title = "Figur 3: Antal Missing Values per Variabel",
+    x = "Variabel",
+    y = "Antal Missing"
+  )
+
+print(fig3_missing_bar)
+# ggsave("fig3_missing_bar.png", width = 10, height = 6, dpi = 300)
+
+# Missing pattern heatmap (subset af variable)
+key_vars <- c("CVD", "AGE", "SEX", "TOTCHOL", "SYSBP", "DIABP", "BMI", 
+              "DIABETES", "GLUCOSE", "CURSMOKE", "HDLC", "LDLC", "educ")
+
+fig4_missing_pattern <- vis_miss(framingham[key_vars]) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "Figur 4: Missing Data Patterns - Key Variables")
+
+print(fig4_missing_pattern)
+# ggsave("fig4_missing_pattern.png", width = 10, height = 6, dpi = 300)
+
+# ----------------------------------------------------------------------------
+# Missing stratificeret på PERIOD
+# ----------------------------------------------------------------------------
+
+# Beregn missing per PERIOD for key variable
+missing_by_period <- framingham %>%
+  group_by(PERIOD) %>%
+  summarise(
+    n = n(),
+    across(all_of(c("HDLC", "LDLC", "GLUCOSE", "educ", "BPMEDS", "TOTCHOL", "BMI")),
+           ~sum(is.na(.)) / n() * 100,
+           .names = "pct_missing_{.col}")
+  ) %>%
+  pivot_longer(
+    cols = starts_with("pct_missing"),
+    names_to = "Variable",
+    values_to = "Pct_Missing",
+    names_prefix = "pct_missing_"
+  )
+
+print(missing_by_period)
+
+# Visualiser missing over PERIOD
+fig5_missing_period <- ggplot(missing_by_period, 
+                              aes(x = PERIOD, y = Pct_Missing, 
+                                  color = Variable, group = Variable)) +
+  geom_line(size = 1) +
+  geom_point(size = 3) +
+  theme_minimal() +
+  labs(
+    title = "Figur 5: Missing Values per PERIOD",
+    x = "PERIOD",
+    y = "Procent Missing (%)",
+    color = "Variabel"
+  ) +
+  theme(legend.position = "right")
+
+print(fig5_missing_period)
+
+# ----------------------------------------------------------------------------
+#  Missing mechanism undersøgelse --> Hvis nødvendigt
+# ----------------------------------------------------------------------------
+
+# Er GLUCOSE missing relateret til andre variable?
+# Sammenlign karakteristika: GLUCOSE missing vs ikke missing
+
+glucose_missing_analysis <- framingham %>%
+  filter(PERIOD == 1) %>%  # Kun baseline for nu
+  mutate(GLUCOSE_missing = is.na(GLUCOSE)) %>%
+  group_by(GLUCOSE_missing) %>%
+  summarise(
+    N = n(),
+    Mean_Age = mean(AGE, na.rm = TRUE),
+    Pct_Male = mean(SEX == 1, na.rm = TRUE) * 100,
+    Pct_CVD = mean(CVD, na.rm = TRUE) * 100,
+    Pct_Diabetes = mean(DIABETES, na.rm = TRUE) * 100,
+    Mean_SYSBP = mean(SYSBP, na.rm = TRUE)
+  )
+
+
+print(glucose_missing_analysis)
+
+# Chi-square test: Er GLUCOSE missing associeret med CVD?
+baseline_data <- framingham %>% filter(PERIOD == 1)
+chisq_glucose_cvd <- chisq.test(
+  table(is.na(baseline_data$GLUCOSE), baseline_data$CVD)
+)
+
+print(chisq_glucose_cvd)
+
+# T-test: Er GLUCOSE missing associeret med AGE?
+t_test_glucose_age <- t.test(AGE ~ is.na(GLUCOSE), data = baseline_data)
+print("T-test: Age difference GLUCOSE missing vs ikke-missing")
+print(t_test_glucose_age)
+
+# ============================================================================
+#  SELECTION OF POTENTIAL PREDICTORS
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# Klassificering baseret på klinisk relevans
+# ----------------------------------------------------------------------------
+
+# Opret prædiktor-tabel
+predictors_classification <- data.frame(
+  Variable = c("AGE", "SEX", "TOTCHOL", "SYSBP", "DIABP", "BMI", 
+               "DIABETES", "CURSMOKE", "GLUCOSE", "HDLC", "LDLC",
+               "BPMEDS", "educ", "HEARTRTE", "CIGPDAY",
+               "PREVCHD", "PREVAP", "PREVMI", "PREVSTRK", "PREVHYP"),
+  Type = c("Continuous", "Binary/Categorical", "Continuous", "Continuous", "Continuous",
+           "Continuous", "Binary", "Binary", "Continuous", "Continuous", 
+           "Continuous", "Binary", "Ordinal", "Continuous", "Continuous",
+           "Binary", "Binary", "Binary", "Binary", "Binary"),
+  Clinical_Relevance = c("High", "High", "High", "High", "High", "High",
+                         "High", "High", "High", "High", "High",
+                         "Medium", "Medium", "Low", "Medium",
+                         "Medium", "Low", "Low", "Low", "Medium"),
+  Known_CVD_Risk_Factor = c("Yes", "Yes", "Yes", "Yes", "Yes", "Yes",
+                            "Yes", "Yes", "Yes", "Yes", "Yes",
+                            "Unclear", "Social", "No", "Yes",
+                            "Prevalent disease", "Prevalent disease", 
+                            "Prevalent disease", "Prevalent disease", "Yes"),
+  Notes = c("", "1=Male, 2=Female", "", "", "Correlated with SYSBP", "",
+            "", "", "Missing 9%", "Missing 100% at baseline", "Missing 100% at baseline",
+            "", "1-4 ordinal", "", "Redundant with CURSMOKE?",
+            "Previous CHD - confounding?", "", "", "", "")
+)
+
+print("POTENTIAL PREDICTORS CLASSIFICATION:")
+print(predictors_classification)
+
+# Fokusér på primary kandidater (high clinical relevance, ikke previous disease)
+primary_predictors <- c("AGE", "SEX", "TOTCHOL", "SYSBP", "BMI", 
+                        "DIABETES", "CURSMOKE", "GLUCOSE")
+
+print("PRIMARY PREDICTOR CANDIDATES:")
+print(primary_predictors)
+
+# ============================================================================
+# . PAIRWISE ASSOCIATIONS OF PREDICTORS
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+#  Korrelationsmatrix - Kontinuerte variable
+# ----------------------------------------------------------------------------
+
+# Vælg kontinuerte prædiktorer (ekskl. HDLC/LDLC pga. missing)
+cont_predictors <- c("AGE", "TOTCHOL", "SYSBP", "DIABP", "BMI", 
+                     "HEARTRTE", "GLUCOSE", "CIGPDAY")
+
+
+# ----------------------------------------------------------------------------
+#  Visualisering - Korrelationsmatrix
+# ---------------------------------------------------------------------------
+
