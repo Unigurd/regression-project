@@ -844,3 +844,220 @@ ggplot(simple_grid, aes(x = SYSBP, y = pred_prob, color = BPMEDS)) +
   theme_minimal() +
   scale_color_manual(values = c("No" = "purple", "Yes" = "white"))
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+==========================================================
+
+
+
+
+
+
+library(splines)
+
+
+
+
+
+
+
+
+# Model 1: Original (lineær for kontinuerte variable)
+model_original <- glm(
+  CVD ~ AGE + SEX + TOTCHOL + SYSBP + PREV_CVD_EVENT_VMI_CHD + 
+    CIGPDAY + DIABETES + BMI + HEARTRTE + PREVHYP,
+  family = binomial(link = "logit"),
+  data = training_data
+)
+
+# Model 2: Splines for kontinuerte variable (undtagen CIGPDAY)
+model_splines <- glm(
+  CVD ~ ns(AGE, df = 3) + SEX + ns(TOTCHOL, df = 3) + 
+    ns(SYSBP, df = 3) + PREV_CVD_EVENT_VMI_CHD + 
+    CIGPDAY + DIABETES + ns(BMI, df = 3) + 
+    ns(HEARTRTE, df = 3) + PREVHYP,
+  family = binomial(link = "logit"),
+  data = training_data
+)
+
+####
+
+# håndtering af CIGPDAY
+log_model_splines_virknu <- glm(
+  CVD ~ ns(AGE, df = 3) + SEX + ns(TOTCHOL, df = 3) + 
+    ns(SYSBP, df = 3) + PREV_CVD_EVENT_VMI_CHD + 
+    # Bedre håndtering af CIGPDAY:
+    I(CIGPDAY == 0) + ns(CIGPDAY[CIGPDAY > 0], df = 2) +  # Separat behandling af 0 og >0
+    DIABETES + ns(BMI, df = 3) + 
+    ns(HEARTRTE, df = 3) + PREVHYP,
+  family = binomial(link = "logit"),
+  data = training_data
+)
+
+
+
+
+log_model_splines_categorical <- glm(
+  CVD ~ ns(AGE, df = 3) + SEX + ns(TOTCHOL, df = 3) + 
+    ns(SYSBP, df = 3) + PREV_CVD_EVENT_VMI_CHD + 
+    smoking_cat + DIABETES + ns(BMI, df = 3) + 
+    ns(HEARTRTE, df = 3) + PREVHYP,
+  family = binomial(link = "logit"),
+  data = training_data
+)
+
+
+
+library(splines)
+
+# Forbered data: opret nye variabler for splines
+training_data_prepared <- training_data %>%
+  mutate(
+    smoking_indicator = as.numeric(CIGPDAY > 0),  # 1 for rygere, 0 for ikke-rygere
+    cigpday_positive = ifelse(CIGPDAY > 0, CIGPDAY, NA)  # Kun positive værdier
+  )
+
+#
+log_model_splines_corrected <- glm(
+  CVD ~ ns(AGE, df = 3) + SEX + ns(TOTCHOL, df = 3) + 
+    ns(SYSBP, df = 3) + PREV_CVD_EVENT_VMI_CHD + 
+    smoking_indicator + ns(cigpday_positive, df = 2) + 
+    DIABETES + ns(BMI, df = 3) + 
+    ns(HEARTRTE, df = 3) + PREVHYP,
+  family = binomial(link = "logit"),
+  data = training_data_prepared
+)
+
+
+
+log_model_splines_simple <- glm(
+  CVD ~ ns(AGE, df = 3) + SEX + ns(TOTCHOL, df = 3) + 
+    ns(SYSBP, df = 3) + PREV_CVD_EVENT_VMI_CHD + 
+    # Simpel håndtering af CIGPDAY:
+    I(CIGPDAY == 0) + I(log(CIGPDAY + 1)) + 
+    DIABETES + ns(BMI, df = 3) + 
+    ns(HEARTRTE, df = 3) + PREVHYP,
+  family = binomial(link = "logit"),
+  data = training_data
+)
+
+
+
+
+
+training_data <- training_data %>%
+  mutate(
+    smoking_cat = case_when(
+      CIGPDAY == 0 ~ "Non_smoker",
+      CIGPDAY <= 10 ~ "Light_1_10",
+      CIGPDAY <= 20 ~ "Moderate_11_20", 
+      TRUE ~ "Heavy_20_plus"
+    ),
+    smoking_cat = factor(smoking_cat)
+  )
+
+
+
+log_model_splines_final <- glm(
+  CVD ~ ns(AGE, df = 3) + SEX + ns(TOTCHOL, df = 3) + 
+    ns(SYSBP, df = 3) + PREV_CVD_EVENT_VMI_CHD + 
+    smoking_cat + DIABETES + ns(BMI, df = 3) + 
+    ns(HEARTRTE, df = 3) + PREVHYP,
+  family = binomial(link = "logit"),
+  data = training_data
+)
+
+
+
+
+
+# Tjek om modellen konvergerede
+summary(log_model_splines_final)
+
+}
+
+# Sammenlign med original model
+original_vs_splines <- anova(
+  log_model_extend_2b_HRT_PPP_COMB_VMI_CHD, 
+  log_model_splines_final, 
+  test = "Chisq"
+)
+
+print(original_vs_splines)
+
+
+# Forbered validation data
+validation_data_prepared <- validation_data %>%
+  mutate(
+    smoking_cat = case_when(
+      CIGPDAY == 0 ~ "Non_smoker",
+      CIGPDAY <= 10 ~ "Light_1_10",
+      CIGPDAY <= 20 ~ "Moderate_11_20",
+      TRUE ~ "Heavy_20_plus"
+    ),
+    smoking_cat = factor(smoking_cat)
+  )
+
+# Forbered validation_data på samme måde som training_data
+validation_data_prepared <- validation_data %>%
+  mutate(
+    PREV_CVD_EVENT_VMI_CHD = ifelse(PREVMI == 1 | PREVCHD == 1 | PREVAP == 1, 1, 0),
+    smoking_cat = case_when(
+      CIGPDAY == 0 ~ "Non_smoker",
+      CIGPDAY <= 10 ~ "Light_1_10",
+      CIGPDAY <= 20 ~ "Moderate_11_20",
+      TRUE ~ "Heavy_20_plus"
+    ),
+    smoking_cat = factor(smoking_cat, levels = levels(training_data$smoking_cat))
+  )
+
+# Tjek  nødvendige variabler er på plads
+names(validation_data_prepared)
+
+# Forudsigelser og validering
+splines_predictions <- predict(log_model_splines_final, 
+                               newdata = validation_data_prepared, 
+                               type = "response")
+
+splines_auc <- roc(validation_data_prepared$CVD, splines_predictions)$auc
+
+cat("Splines model validation AUC:", round(splines_auc, 3), "\n")
+
+vars_required <- all.vars(formula(log_model_splines_final))
+missing_var <- setdiff(vars_required, names(validation_data))
+if(length(missing_var)>0){
+  print(missing_var)
+}
+
+
+
+
+validation_data_prepared <- validation_data %>%
+  mutate(
+    PREV_CVD_EVENT_VMI_CHD = ifelse(PREVMI == 1 | PREVCHD == 1 | PREVAP == 1, 1, 0),
+    smoking_cat = case_when(
+      CIGPDAY == 0 ~ "Non_smoker",
+      CIGPDAY <= 10 ~ "Light_1_10",
+      CIGPDAY <= 20 ~ "Moderate_11_20",
+      TRUE ~ "Heavy_20_plus"
+    ),
+    smoking_cat = factor(smoking_cat, levels = levels(training_data$smoking_cat))
+  )
+
