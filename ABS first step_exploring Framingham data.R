@@ -579,3 +579,183 @@ selected_vars %>%
 # ==========================================================================
 
 
+
+  
+
+skim(data)
+summary(data$CIGPDAY)
+glimpse(data$CIGPDAY)
+skim(data$CIGPDAY)
+plot(data$CIGPDAY)
+boxplot(data$CIGPDAY)
+par(mfrow = c(1,2))
+hist(data$CIGPDAY, breaks = 70)
+hist(data$CIGPDAY, breaks = c(0,10, 20, 30, 40, 50, 60, 70))
+plot( data$AGE, data$CIGPDAY)
+
+table(training_data$CIGPDAY)
+# Mange 0-værdier, få positive værdier med begrænset variation
+data <- training_data
+# Opret aldersgrupper
+data_for_plot_CIGPDAY_AGE <- data %>%
+  mutate(age_group = cut(AGE, 
+                         breaks = c(30, 40, 50, 60, 70),
+                         labels = c("30-39", "40-49", "50-59", "60-70")))
+
+ggplot(data_for_plot_CIGPDAY_AGE, aes(x = age_group, y = CIGPDAY)) +
+  geom_boxplot(fill = "lightblue", alpha = 0.7) +
+  stat_summary(fun = mean, geom = "point", shape = 18, size = 3, color = "red") +
+  labs(
+    title = "Cigarettes per Day by Age Group",
+    subtitle = "Red diamond = mean, Box = IQR",
+    x = "Age Group",
+    y = "Cigarettes per Day"
+  ) +
+  theme_minimal()
+
+ggplot(data_for_plot_CIGPDAY_AGE, aes(x = age_group, y = CIGPDAY)) +
+  geom_violin(fill = "lightgreen", alpha = 0.6) +
+  geom_boxplot(width = 0.2, fill = "white", alpha = 0.8) +
+  labs(
+    title = "Distribution of Cigarette Consumption by Age",
+    x = "Age Group", 
+    y = "Cigarettes per Day"
+  ) +
+  theme_minimal()
+
+# Opret ryger kategorier
+data_smoke_Categ <- data_for_plot_CIGPDAY_AGE %>%
+  mutate(smoking_status = case_when(
+    CIGPDAY == 0 ~ "Non-smoker (0)",
+    CIGPDAY <= 10 ~ "Lightsmokers (1-10)",
+    CIGPDAY <= 20 ~ "Moderate smoker (10-20)", 
+    TRUE ~ "Heavysmokers > (20)"
+  ))
+summary(data_smoke_Categ)
+
+# Mere detaljeret summary inklusive CVD
+detailed_smoking_summary <- data_smoke_Categ %>%
+  mutate(smoking_status = factor(smoking_status,
+                                 levels = c("Non-smoker (0)",
+                                            "Lightsmokers (1-10)",
+                                            "Moderate smoker (10-20)",
+                                            "Heavysmokers > (20)"))) %>% 
+  group_by(smoking_status) %>%
+  summarise(
+    # Basis statistik
+    n = n(),
+    percentage = round(n / nrow(data_smoke_Categ) * 100, 1),
+    
+    # Alder statistik
+    mean_age = round(mean(AGE), 1),
+    median_age = median(AGE),
+    age_range = paste(min(AGE), "-", max(AGE)),
+    
+    # CVD statistik
+    n_cvd = sum(CVD == 1),
+    pct_cvd = round(n_cvd / n * 100, 1),
+    
+    # Køn fordeling
+    n_male = sum(SEX == 1),  # Antag SEX=1 er male
+    pct_male = round(n_male / n * 100, 1),
+    
+    .groups = 'drop'
+  ) %>% 
+  arrange(smoking_status)
+
+print(detailed_smoking_summary)
+
+# Stacked bar plot
+ggplot(data_smoke_Categ, aes(x = age_group, fill = smoking_status)) +
+  geom_bar(position = "fill") +
+  scale_fill_brewer(palette = "Set2") +
+  labs(
+    title = "Smoking Status Distribution by Age Group",
+    subtitle = "Proportion of each smoking category",
+    x = "Age Group",
+    y = "Proportion",
+    fill = "Smoking Status"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+
+ggplot(data_smoke_Categ, aes(x = AGE, y = CIGPDAY)) +
+  geom_jitter(alpha = 0.3, width = 0.5, height = 0.5, color = "blue") +
+  geom_smooth(method = "loess", color = "red", se = TRUE) +
+  labs(
+    title = "Cigarette Consumption vs Age with Trend Line",
+    x = "Age",
+    y = "Cigarettes per Day"
+  ) +
+  theme_minimal()
+
+# Facet plot med CVD status
+ggplot(data_smoke_Categ , aes(x = age_group, y = CIGPDAY, fill = factor(CVD))) +
+  geom_boxplot(alpha = 0.7) +
+  facet_wrap(~ factor(CVD, labels = c("No CVD", "CVD")), ncol = 2) +
+  scale_fill_manual(values = c("lightblue", "salmon")) +
+  labs(
+    title = "Cigarette Consumption by Age and CVD Status",
+    x = "Age Group",
+    y = "Cigarettes per Day",
+    fill = "CVD Status"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+
+# Fokus kun på rygere
+smokers_data <- data_smoke_Categ %>% filter(CIGPDAY > 0)
+
+ggplot(smokers_data, aes(x = AGE, y = CIGPDAY)) +
+  geom_point(alpha = 0.5, color = "darkred") +
+  geom_density_2d_filled(alpha = 0.7) +
+  geom_smooth(method = "lm", color = "black", linetype = "dashed") +
+  labs(
+    title = "Density of Cigarette Consumption by Age (Smokers Only)",
+    subtitle = "Contour lines show density of observations",
+    x = "Age",
+    y = "Cigarettes per Day"
+  ) +
+  theme_minimal()
+
+# install.packages("plotly")
+library(plotly)
+
+p <- ggplot(data, aes(x = AGE, y = CIGPDAY, color = factor(CVD), 
+                      text = paste("Age:", AGE, "<br>Cigarettes:", CIGPDAY))) +
+  geom_jitter(alpha = 0.6) +
+  scale_color_manual(values = c("blue", "red"), labels = c("No CVD", "CVD")) +
+  labs(
+    title = "Cigarette Consumption by Age and CVD Status",
+    x = "Age",
+    y = "Cigarettes per Day",
+    color = "CVD Status"
+  ) +
+  theme_minimal()
+
+ggplotly(p, tooltip = "text")
+
+
+
+
+# Opret summary statistiker
+smoking_summary <- data_smoke_Categ %>%
+  group_by(age_group) %>%
+  summarise(
+    n = n(),
+    n_smokers = sum(CIGPDAY > 0),
+    pct_smokers = round(n_smokers / n * 100, 1),
+    mean_cigarettes = round(mean(CIGPDAY[CIGPDAY > 0]), 1),
+    median_cigarettes = median(CIGPDAY[CIGPDAY > 0]),
+    .groups = 'drop'
+  )
+
+print(smoking_summary)
+
+
+# 
+
+
+
