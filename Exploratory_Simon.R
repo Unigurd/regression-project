@@ -110,3 +110,5 @@ cor(corr_data$PREVHYP, corr_data$SYSBP) # 0.67
 
 table(data$PREVSTRK)
 
+# I change something
+
