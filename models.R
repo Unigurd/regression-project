@@ -991,7 +991,7 @@ log_model_splines_final <- glm(
 # Tjek om modellen konvergerede
 summary(log_model_splines_final)
 
-}
+# }
 
 # Sammenlign med original model
 original_vs_splines <- anova(

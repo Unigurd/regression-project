@@ -13,6 +13,7 @@
 # ___________________________________________________________
 
 
+library(skimr)
 library(riskCommunicator) # Framingham data
 library(dplyr)   # For at manipulere data (data_mamipulation)
 library(ggplot2)   # Visualisering & plots.
@@ -26,7 +27,7 @@ library(RwR)    # For bike dataset
 library(ggplot2)    # For plotting
 library(broom)   # For tidy model output
 library(dplyr)      # For data manipulation
-library(MASS)
+## library(MASS)
 library(splines)    # For spline models
 #install.packages("GGally")
 # Load data
@@ -564,7 +565,7 @@ for (var in response_vars) {
 # Check for impossible values
 
 range(selected_vars$AGE, na.rm = TRUE)
-cat("SYSBP range:", range(selected_vars$SYSBP, na.rm = TRUE)
+cat("SYSBP range:", range(selected_vars$SYSBP, na.rm = TRUE))
 range(selected_vars$BMI, na.rm = TRUE)
 
 # Check CIGPDAY when CURSMOKE = 0
@@ -580,7 +581,9 @@ selected_vars %>%
 
 
 
-  
+
+data <- read.csv("training_data.csv")
+training_data <- read.csv("training_data.csv")
 
 skim(data)
 summary(data$CIGPDAY)
