@@ -1317,8 +1317,11 @@ plot_marginal_predictions(model3, "GLUCOSE", seq(1,500))
 plot_marginal_predictions(model3, "SYSBP", seq(0,350))
 
 
-
-form4  <- CVD ~ AGE + SEX + SYSBP + TOTCHOL + CIGPDAY + log(BMI)
+## left out: PREVMI + DIABETES + PREVHYP + log(HEARTRTE) +
+## CIGPDAY + educ + log(GLUCOSE) + PREVAP + BPMEDS + PREVSTRK
+form4  <- CVD ~ AGE + SEX +
+    ns(SYSBP, knots=knots_sysbp, Boundary.knots=bnds_sysbp) +
+    TOTCHOL + CIGPDAY * log(BMI)
 model4 <- fit.mult.impute(
     form4,
     function(formula, data){glm(formula, data, family=binomial(link=logit))},
