@@ -1418,3 +1418,19 @@ plot_marginal_predictions(model4, "TOTCHOL", seq(0,600))
 plot_marginal_predictions(model4, "BMI", seq(1,75))
 
 plot_marginal_predictions(model4, "SYSBP", seq(0,350))
+
+
+dens <- ggplot(model4_aug2, aes(.fitted)) + geom_density(alpha=0.4)
+gridExtra::grid.arrange(
+               dens + aes(fill=plotting_data$PREVMI),
+               dens + aes(fill=plotting_data$PREVSTRK),
+               ncol=2
+           )
+
+
+dens <- ggplot(model3_aug2, aes(.fitted)) + geom_density(alpha=0.4)
+gridExtra::grid.arrange(
+               dens + aes(fill=plotting_data$PREVMI),
+               dens + aes(fill=plotting_data$PREVSTRK),
+               ncol=2
+           )
