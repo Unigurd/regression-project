@@ -840,10 +840,10 @@ ggplot(plotting_data, aes(SYSBP, as.numeric(CVD)-1)) +
 plotting_data |> filter(SYSBP < 100)
 
 
-knots_sysbp <- as.vector(quantile(framingham7$SYSBP, probs=c(0.33,0.67), na.rm=1))
-knots_log_bmi   <- as.vector(quantile(log(framingham7$BMI), probs=c(0.33,0.67), na.rm=1))
-knots_log_gluc  <- as.vector(quantile(log(framingham7$GLUCOSE), probs=c(0.33,0.67), na.rm=1))
-bnds_sysbp <- range(framingham7$SYSBP, na.rm=1)
+knots_sysbp    <- as.vector(quantile(framingham7$SYSBP, probs=c(0.33,0.67), na.rm=1))
+knots_log_bmi  <- as.vector(quantile(log(framingham7$BMI), probs=c(0.33,0.67), na.rm=1))
+knots_log_gluc <- as.vector(quantile(log(framingham7$GLUCOSE), probs=c(0.33,0.67), na.rm=1))
+bnds_sysbp     <- range(framingham7$SYSBP, na.rm=1)
 bnds_log_bmi   <- range(log(framingham7$BMI), na.rm=1)
 bnds_log_gluc  <- range(log(framingham7$GLUCOSE), na.rm=1)
 form2  <- CVD ~ SEX + AGE +
