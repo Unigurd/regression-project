@@ -269,10 +269,6 @@ drop1(model1, test="LRT") |>
 ## it is not to get CVD.
 tidy(model1, conf.int=TRUE)[-1, c("term", "conf.low", "estimate", "conf.high")] |>
     arrange(estimate) |>
-    ## The use of `confint.lm` instead of `confint` is because the latter is slower.
-    ## We just want approximate intervals right now.
-    ## cbind(confint.lm(model1)[-1,]) |>
-    ## cbind(confint(model1)[-1,]) |>
     mutate(
         `estimate 2.5%` = `conf.low`,
         `estimate 97.5%`= `conf.high`,
@@ -282,15 +278,6 @@ tidy(model1, conf.int=TRUE)[-1, c("term", "conf.low", "estimate", "conf.high")] 
         `conf.low`      = NULL,
         `conf.high`     = NULL,
         ) |>
-    ## mutate(
-    ##     `estimate 2.5%` = `2.5 %`,
-    ##     `estimate 97.5%`= `97.5 %`,
-    ##     `OR 2.5%`       = exp(`2.5 %`),
-    ##     `OR`            = exp(estimate),
-    ##     `OR 97.5%`      = exp(`97.5 %`),
-    ##     `2.5 %`         = NULL,
-    ##     `97.5 %`        = NULL,
-    ##     ) |>
     relocate(estimate, .after=`estimate 2.5%`) |>
     knitr::kable(digits=2)
 
@@ -762,10 +749,6 @@ drop1(model2, test="LRT") |>
 ## Glucose has an extreme OR
 tidy(model2, conf.int=TRUE)[-1, c("term", "conf.low", "estimate", "conf.high")] |>
     arrange(estimate) |>
-    ## The use of `confint.lm` instead of `confint` is because the latter is slower.
-    ## We just want approximate intervals right now.
-    ## cbind(confint.lm(model2)[-1,]) |>
-    ## cbind(confint(model2)[-1,]) |>
     mutate(
         `estimate 2.5%` = `conf.low`,
         `estimate 97.5%`= `conf.high`,
@@ -775,15 +758,6 @@ tidy(model2, conf.int=TRUE)[-1, c("term", "conf.low", "estimate", "conf.high")] 
         `conf.low`      = NULL,
         `conf.high`     = NULL,
         ) |>
-    ## mutate(
-    ##     `estimate 2.5%` = `2.5 %`,
-    ##     `estimate 97.5%`= `97.5 %`,
-    ##     `OR 2.5%`       = exp(`2.5 %`),
-    ##     `OR`            = exp(estimate),
-    ##     `OR 97.5%`      = exp(`97.5 %`),
-    ##     `2.5 %`         = NULL,
-    ##     `97.5 %`        = NULL,
-    ##     ) |>
     relocate(estimate, .after=`estimate 2.5%`) |>
     knitr::kable(digits=2)
 
@@ -1042,10 +1016,6 @@ drop1(model3, test="LRT") |>
 ## Glucose has an extreme OR
 tidy(model3, conf.int=TRUE)[-1, c("term", "conf.low", "estimate", "conf.high")] |>
     arrange(estimate) |>
-    ## The use of `confint.lm` instead of `confint` is because the latter is slower.
-    ## We just want approximate intervals right now.
-    ## cbind(confint.lm(model3)[-1,]) |>
-    ## cbind(confint(model3)[-1,]) |>
     mutate(
         `estimate 2.5%` = `conf.low`,
         `estimate 97.5%`= `conf.high`,
@@ -1055,15 +1025,6 @@ tidy(model3, conf.int=TRUE)[-1, c("term", "conf.low", "estimate", "conf.high")] 
         `conf.low`      = NULL,
         `conf.high`     = NULL,
         ) |>
-    ## mutate(
-    ##     `estimate 2.5%` = `2.5 %`,
-    ##     `estimate 97.5%`= `97.5 %`,
-    ##     `OR 2.5%`       = exp(`2.5 %`),
-    ##     `OR`            = exp(estimate),
-    ##     `OR 97.5%`      = exp(`97.5 %`),
-    ##     `2.5 %`         = NULL,
-    ##     `97.5 %`        = NULL,
-    ##     ) |>
     relocate(estimate, .after=`estimate 2.5%`) |>
     knitr::kable(digits=2)
 
@@ -1226,7 +1187,6 @@ model4 <- fit.mult.impute(
     data=framingham7
 )
 
-
 anova(model4, model1, test="LRT")
 
 drop1(model4, test="LRT") |>
@@ -1238,10 +1198,6 @@ drop1(model4, test="LRT") |>
 ## Glucose has an extreme OR
 tidy(model4, conf.int=TRUE)[-1, c("term", "conf.low", "estimate", "conf.high")] |>
     arrange(estimate) |>
-    ## The use of `confint.lm` instead of `confint` is because the latter is slower.
-    ## We just want approximate intervals right now.
-    ## cbind(confint.lm(model4)[-1,]) |>
-    ## cbind(confint(model4)[-1,]) |>
     mutate(
         `estimate 2.5%` = `conf.low`,
         `estimate 97.5%`= `conf.high`,
@@ -1251,15 +1207,6 @@ tidy(model4, conf.int=TRUE)[-1, c("term", "conf.low", "estimate", "conf.high")] 
         `conf.low`      = NULL,
         `conf.high`     = NULL,
         ) |>
-    ## mutate(
-    ##     `estimate 2.5%` = `2.5 %`,
-    ##     `estimate 97.5%`= `97.5 %`,
-    ##     `OR 2.5%`       = exp(`2.5 %`),
-    ##     `OR`            = exp(estimate),
-    ##     `OR 97.5%`      = exp(`97.5 %`),
-    ##     `2.5 %`         = NULL,
-    ##     `97.5 %`        = NULL,
-    ##     ) |>
     relocate(estimate, .after=`estimate 2.5%`) |>
     knitr::kable(digits=2)
 
@@ -1352,29 +1299,6 @@ gridExtra::grid.arrange(
                                   filter=plotting_data$CIGPDAY >= 40),
                ncol=3
            )
-
-
-## cal_plot + group_p(framingham$CVD, fitted(model4))
-
-## gridExtra::grid.arrange(
-##                cal_plot + group_p(framingham$CVD, fitted(model4), filter=framingham$SEX == "F"),
-##                cal_plot + group_p(framingham$CVD, fitted(model4), filter=framingham$SEX == "M"),
-##                ncol=2
-##            )
-
-## gridExtra::grid.arrange(
-##                cal_plot + group_p(framingham$CVD, fitted(model4), filter=framingham$educ == "1"),
-##                cal_plot + group_p(framingham$CVD, fitted(model4), filter=framingham$educ == "2"),
-##                cal_plot + group_p(framingham$CVD, fitted(model4), filter=framingham$educ == "3"),
-##                cal_plot + group_p(framingham$CVD, fitted(model4), filter=framingham$educ == "4"),
-##                ncol=2
-##            )
-
-## gridExtra::grid.arrange(
-##                cal_plot + group_p(framingham$CVD, fitted(model4), filter=framingham$CIGPDAY == 0),
-##                cal_plot + group_p(framingham$CVD, fitted(model4), filter=framingham$CIGPDAY != 0),
-##                ncol=2
-##            )
 
 
 model4_aug2 <- augment(model4, type.predict="response", type.residuals = "pearson")
