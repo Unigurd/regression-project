@@ -2,6 +2,8 @@ library(dplyr)
 library(ggplot2)
 library(survival)
 library(tidyr)
+library(broom)
+library(ggbeeswarm)
 
 setwd("C:/Users/SIMON/Desktop/GitHub/regression-project")
 surv_data <- read.csv("training_data.csv") %>%
@@ -17,6 +19,8 @@ surv_data_final <- surv_data %>%
     TOTCHOL < 600,
     SYSBP < 250,
   ) |>
+  mutate(Prev_sick = ifelse(PREVCHD == 1 | PREVAP == 1 | PREVMI == 1 | PREVSTRK == 1 | PREVHYP == 1 , 1, 0)) |>
+  select(-c("PREVCHD", "PREVAP", "PREVMI", "PREVSTRK", "PREVHYP")) |>
   drop_na()
 
 # check distribution of TIMECVD
@@ -105,11 +109,107 @@ surv_arg_CVD <- Surv(time = surv_data_final$TIMECVD, event = surv_data_final$CVD
 survfit_CVD <- survfit(surv_arg_CVD ~ 1)
 surv_plot_CVD <- summary(survfit_CVD, data.frame = TRUE) %>%
   ggplot(aes(time, surv)) +
-  geom_step()
+  geom_step() +
+  ylim(0,1) +
+  xlab("Time (days)") + 
+  ylab("Probability of not having CVD")
 surv_plot_CVD
 
 # This looks like something we would want to see! The survival function is decreasing at a constant rate
 # The survival prob. at the end of the sollow-up periods is about 70 %
 
+# What happens if we treat TIMECVD as uncensored?
+# Will use this version as baseline
+surv_arg_uncensored <- Surv(time = surv_data_final$TIMECVD, event = surv_data_final$CVD)
+survfit_uncensored <- survfit(surv_arg_uncensored ~ 1)
+surv_plot_uncensored <- summary(survfit_uncensored, data.frame = TRUE) %>%
+  ggplot(aes(time+0.5, surv)) + # use time +0.5 here as in RwR
+  geom_step() +
+  ylim(0,1) +
+  xlab("Time (days)") + 
+  ylab("Probability of not having CVD")
+surv_plot_uncensored
+# no noticeable change
 
+# Maybe there are interesting results when you condition on having had a coronary heart disease?
+survfit_PREVCHD <- survfit(surv_arg_CVD ~ surv_data_final$PREVCHD)
+surv_plot_CHD <- summary(survfit_PREVCHD, data.frame = TRUE) %>%
+  ggplot(aes(time, surv, colour = )) +
+  geom_step() +
+  ylim(0,1) +
+  xlab("Time (days)") + 
+  ylab("Probability of not having CVD given prev. CHD")
+surv_plot_CHD
 
+# this plot is weird. 
+
+# What about sex?
+survfit_sex <- survfit(surv_arg_CVD ~ surv_data_final$SEX)
+surv_plot_sex <- summary(survfit_sex, data.frame = TRUE) %>%
+  ggplot(aes(time, surv)) +
+  geom_step() +
+  ylim(0,1) +
+  xlab("Time (days)") + 
+  ylab("Probability of not having CVD given sex")
+surv_plot_sex
+
+# what does this tell me?
+
+# do a regression explaining impact of previous diseases
+surv_reg_prev <- survreg(
+  Surv(TIMECVD + 0.5 , CVD == 1) ~ Prev_sick,
+  data = surv_data_final
+)
+surv_reg_prev
+
+surv_reg_cox <- coxph(
+  Surv(TIMECVD + 0.5, CVD == 1) ~ Prev_sick,
+  data = surv_data_final
+)
+surv_reg_cox
+
+baseline_cox <- survfit(surv_reg_cox) 
+summary(baseline_cox, data.frame = TRUE) |>
+  ggplot(aes(time + 0.5, surv)) + 
+  geom_ribbon(aes(ymin = lower, ymax = upper), fill = "gray90") +
+  geom_step() +
+  ylim(0, 1) +
+  xlab("time (months)") + 
+  ylab("survival probability") 
+
+# create predictor data:
+pred_frame <- tibble(
+  data = 1:2,
+  Prev_sick = factor(1:2, labels = levels(as.factor(surv_data_final$Prev_sick))),
+  strata = factor(1:2, labels = paste("Prev_sick=", Prev_sick, sep = ""))
+)
+
+  survfit(surv_reg_cox, newdata = pred_frame) |>
+    summary(data.frame = TRUE) |>
+    left_join(pred_frame) |>
+    ggplot(aes(time, surv, color = strata)) + 
+    geom_line(data = fit, linetype = 2) +
+    geom_step() +
+    ylim(0, 1) +
+    xlab("time (months)") + 
+    ylab("survival probability") +
+    theme(legend.position = "top")
+  
+  
+  augment(surv_reg_cox, data = surv_data_final) |> 
+    ggplot(aes(Prev_sick, .resid)) + 
+    ggbeeswarm::geom_beeswarm(alpha = 0.4) + 
+    geom_point(
+      stat = "summary", 
+      fun = mean, 
+      color = "blue", 
+      size = 2.5
+    ) +
+    geom_errorbar(
+      stat = "summary", 
+      fun.data = mean_se, 
+      fun.args = list(mult = 1.96),
+      color = "blue", 
+      width = 0.15, 
+      linewidth = 0.7
+    )
