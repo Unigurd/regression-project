@@ -9,10 +9,15 @@ library(tidyr)
 library(hexbin)
 library(ggplot2)
 
+## In order for us to use assumption A4 about the values of CVD being uncorrelated conditioned on the other variables, we need to get rid of all but one observation for each person. Otherwise there will be an obvious correlation between the values of CVD for the observations of the same person: They will be the same. We do this now so that when we start plotting the distributions of our variables we can better justify thinking of each observation as independent, making the plots easier to interpret.
+
+## The simplest would be to just keep the observations from the first checkup, but we would like to see if we can squeeze a bit more out of the data. We can check whether some people had their first checkup in the second or third period:
 set.seed(8088)
 framingham1 <- as_tibble(read.csv("training_data.csv"))
+table((framingham1 |> mutate(firstp=min(PERIOD), .by=RANDID) |> distinct(RANDID, .keep_all=1))$firstp)
+## So we can potentially increase our dataset by around 10% if we use these observations too. But since their first checkup was later, they would have been observed for a shorter time, and it would thus be less likely that a CVD event would have occurred. We therefore need to make sure that the observations we choose don't have too small an observation period so our estimates of CVD probabilities don't get skewed downwards. We would have had to do the same if we only used observations from the first checkup, using later observations just makes the effect more pronounced.
 
-
+## To do this we notice in the documentation of the data set that all the time-to-event columns like TIMECVD, TIMEDTH and so on register the real censoring time for each subject when the given event didn't occur. We have checked that these are all in agreement except for TIMEDTH which sometimes has the end-of-followup time even when the other time-to-event columns indicate the subject was lost to followup before that. The following piece of code calculates the observation duration. The variable TIME records the time since the baseline exams in period 1, regardless of whether a person had an exam then. We therefore need to subtract it.
 framingham2 <- framingham1 |>
     mutate(
         timeap   = ifelse(ANGINA   == 1, -1, TIMEAP),
