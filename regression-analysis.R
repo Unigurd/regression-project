@@ -41,25 +41,143 @@ all(unique(framingham2$RANDID) == unique(framingham3$RANDID))
 # exactly once.
 n_distinct(framingham2$RANDID) == nrow(framingham3)
 
-framingham4 <- framingham3 |> filter(CVD == 1 | time_to_censor > 12*365.25)
-framingham5 <- framingham4 |> select(-c(HDLC, LDLC))
+framingham4 <- framingham3 |> filter(time_to_censor > 12*365.25, time_to_cvd >= 0)
 
-framingham5 |>
-    skim() |>
-    select(skim_variable, n_missing) |>
-    filter(n_missing != 0) |>
-    arrange(desc(n_missing))
+# Drop all irrelevant columns here
+framingham5 <- framingham4 |>
+    mutate(
+        AGE,
+        TOTCHOL,
+        SYSBP,
+        DIABP,
+        CIGPDAY,
+        BMI,
+        HEARTRTE,
+        GLUCOSE,
+        CVD      = as.ordered(CVD),
+        SEX      = ordered(SEX, levels=c(1,2), labels=c("M", "F")),
+        educ     = as.ordered(educ),
+        CURSMOKE = as.ordered(CURSMOKE),
+        DIABETES = as.ordered(DIABETES),
+        BPMEDS   = as.ordered(BPMEDS),
+        PREVCHD  = as.ordered(PREVCHD),
+        PREVAP   = as.ordered(PREVAP),
+        PREVMI   = as.ordered(PREVMI),
+        PREVSTRK = as.ordered(PREVSTRK),
+        PREVHYP  = as.ordered(PREVHYP),
+        .keep="none"
+    )
+    ## select(-c(
+    ##             ## Not measurements of a person
+    ##             X, RANDID, time_to_cvd, time_censor, time_to_censor, TIME, PERIOD,
+    ##             ## Only measured in the third checkup
+    ##             HDLC, LDLC,
+    ##             ## We cannot use something happening in the future to predict.
+    ##             DEATH, ANGINA, HOSPMI, MI_FCHD, ANYCHD, STROKE, HYPERTEN,
+    ##             TIMEAP, TIMEMI, TIMEMIFC, TIMECHD, TIMESTRK, TIMECVD, TIMEDTH, TIMEHYP))
 
-table(rowSums(is.na(framingham5)))
-
-framingham5 |>
-    select(TOTCHOL, CIGPDAY, BPMEDS, GLUCOSE, educ)|>
-    filter(rowSums(is.na(framingham5)) >= 2) |>
-    print(n=64)
 
 
-framingham6 <- framingham5 |>
-    filter(!is.na(CIGPDAY), !is.na(BMI))
+## Move conversion to factors up here for nicer plotting
+
+gridExtra::grid.arrange(
+               ggplot(data=framingham5, aes(TOTCHOL))  + geom_density(fill=gray(0.7)),
+               ggplot(data=framingham5, aes(AGE))      + geom_density(fill=gray(0.7)),
+               ggplot(data=framingham5, aes(SYSBP))    + geom_density(fill=gray(0.7)),
+               ggplot(data=framingham5, aes(DIABP))    + geom_density(fill=gray(0.7)),
+               ggplot(data=framingham5, aes(CIGPDAY))  + geom_density(fill=gray(0.7)),
+               ggplot(data=framingham5, aes(BMI))      + geom_density(fill=gray(0.7)),
+               ggplot(data=framingham5, aes(HEARTRTE)) + geom_density(fill=gray(0.7)),
+               ggplot(data=framingham5, aes(GLUCOSE))  + geom_density(fill=gray(0.7)),
+               ncol=4
+           )
+
+gridExtra::grid.arrange(
+               ggplot(data=framingham5, aes(SEX))      + geom_bar(fill=gray(0.7)),
+               ggplot(data=framingham5, aes(CURSMOKE)) + geom_bar(fill=gray(0.7)),
+               ggplot(data=framingham5, aes(DIABETES)) + geom_bar(fill=gray(0.7)),
+               ggplot(data=framingham5, aes(BPMEDS))   + geom_bar(fill=gray(0.7)),
+               ggplot(data=framingham5, aes(educ))     + geom_bar(fill=gray(0.7)),
+               ggplot(data=framingham5, aes(PREVCHD))  + geom_bar(fill=gray(0.7)),
+               ggplot(data=framingham5, aes(PREVAP))   + geom_bar(fill=gray(0.7)),
+               ggplot(data=framingham5, aes(PREVMI))   + geom_bar(fill=gray(0.7)),
+               ggplot(data=framingham5, aes(PREVSTRK)) + geom_bar(fill=gray(0.7)),
+               ggplot(data=framingham5, aes(PREVHYP))  + geom_bar(fill=gray(0.7)),
+               ggplot(data=framingham5, aes(CVD))      + geom_bar(fill=gray(0.7)),
+               ncol=4
+           )
+
+
+# Taken from the book chapter 3
+ggally_hexbin <- function(data, mapping, ...) {
+                                               ggplot(data, mapping) + stat_binhex(...)
+                                               }
+
+
+# We see that SYSBP and DIABP are the most correlated with a Corr score of 0.722.
+# We see a single outlier for HEARTRTE, four for TOTCHOL, maybe some for SYSBP?
+# So we should maybe pick DIABP over it?
+# CIGPDAY and educ are very skewed, as are most of the binary factors.
+# Should we make groupings for CIGPDAY?
+# Should we make groupings for time_to_censor? four of them?
+GGally::ggpairs(
+            framingham5,
+            columns = c("AGE", "TOTCHOL", "SYSBP",
+                        "DIABP", "CIGPDAY", "BMI", "HEARTRTE", "GLUCOSE"),
+            lower   = list(continuous = GGally::wrap("hexbin", bins=20)),
+            diag = list(continuous = "blankDiag")
+        )
+
+
+cp <- cor(
+    data.matrix(framingham5),
+    use    = "complete.obs",
+    method = "spearman"
+)
+corrplot::corrplot(
+              cp,
+              diag    = FALSE,
+              order   = "hclust",
+              addrect = 14,
+              tl.srt  = 45,
+              tl.col  = "black",
+              tl.cex  = 0.8
+          )
+
+density_by_cvd_legend <- ggplot(data=framingham5, aes(fill=as.factor(CVD)))  + geom_density(alpha=0.4)
+density_by_cvd        <- density_by_cvd_legend + theme(legend.position="none")
+gridExtra::grid.arrange(
+               density_by_cvd + aes(TOTCHOL),  density_by_cvd + aes(AGE),
+               density_by_cvd + aes(SYSBP),    density_by_cvd + aes(DIABP),
+               density_by_cvd + aes(CIGPDAY),  density_by_cvd + aes(BMI),
+               density_by_cvd + aes(HEARTRTE), density_by_cvd + aes(GLUCOSE),
+               ncol=4
+           )
+
+side_bars_legend <- ggplot(data=framingham5, aes(SEX, fill=CVD)) + geom_bar(position="dodge", alpha=0.7)
+side_bars        <- side_bars_legend + theme(legend.position="none")
+gridExtra::grid.arrange(
+               side_bars + aes(SEX),         side_bars + aes(CURSMOKE),
+               side_bars + aes(DIABETES),    side_bars + aes(BPMEDS),
+               side_bars_legend + aes(educ), side_bars + aes(PREVCHD),
+               side_bars + aes(PREVAP),      side_bars + aes(PREVMI),
+               side_bars + aes(PREVSTRK),    side_bars + aes(PREVHYP),
+               ncol=5
+           )
+
+stacked_bars_legend <- ggplot(data=framingham5, aes(fill=CVD)) + geom_bar(position="fill", alpha=0.7)
+stacked_bars<- stacked_bars_legend + theme(legend.position="none")
+gridExtra::grid.arrange(
+               stacked_bars + aes(PREVCHD), stacked_bars + aes(PREVAP),
+               stacked_bars + aes(PREVMI), stacked_bars + aes(PREVSTRK),
+               stacked_bars_legend + aes(PREVHYP),
+               ncol=5
+           )
+
+
+## Maybe remove PREVHYP too? It has high correlation with SYSBP.
+framingham6 <- framingham5 |> select(-c(CURSMOKE, DIABP, PREVCHD))
+
 
 framingham6 |>
     skim() |>
@@ -69,35 +187,56 @@ framingham6 |>
 
 table(rowSums(is.na(framingham6)))
 
-framingham6 |>
-    select(TOTCHOL, BPMEDS, GLUCOSE, educ)|>
+cona6 <- framingham6 |>
+    select(TOTCHOL, CIGPDAY, BPMEDS, GLUCOSE, educ)|>
     filter(rowSums(is.na(framingham6)) >= 2) |>
+    ## print(n=64)
+    as.matrix() |>
+    is.na() |>
+    crossprod()
+round(sweep(cona6, 1, diag(cona6), "/"), 2)
+
+
+framingham7 <- framingham6 |>
+    filter(!is.na(CIGPDAY), !is.na(BMI))
+
+framingham7 |>
+    skim() |>
+    select(skim_variable, n_missing) |>
+    filter(n_missing != 0) |>
+    arrange(desc(n_missing))
+
+table(rowSums(is.na(framingham7)))
+
+framingham7 |>
+    select(TOTCHOL, BPMEDS, GLUCOSE, educ)|>
+    filter(rowSums(is.na(framingham7)) >= 2) |>
     print(n=54)
 
 
-## TODO: remove outliers
-framingham7 <- framingham6 |>
-    mutate(
-        AGE,
-        TOTCHOL,
-        SYSBP,
-        CIGPDAY,
-        BMI,
-        HEARTRTE,
-        GLUCOSE,
-        CVD      = as.ordered(CVD),
-        SEX      = ordered(SEX, levels=c(1,2), labels=c("M", "F")),
-        educ     = as.ordered(educ),
-        DIABETES = as.ordered(DIABETES),
-        BPMEDS   = as.ordered(BPMEDS),
-        PREVAP   = as.ordered(PREVAP),
-        PREVMI   = as.ordered(PREVMI),
-        PREVSTRK = as.ordered(PREVSTRK),
-        PREVHYP  = as.ordered(PREVHYP),
-        .keep="none"
-    )
-## select(CVD, SEX, AGE, educ, TOTCHOL, SYSBP, CIGPDAY, BMI, DIABETES,
-##        BPMEDS, HEARTRTE, GLUCOSE, PREVAP, PREVMI, PREVSTRK, PREVHYP)
+## ## TODO: remove outliers
+## framingham7 <- framingham6 |>
+##     mutate(
+##         AGE,
+##         TOTCHOL,
+##         SYSBP,
+##         CIGPDAY,
+##         BMI,
+##         HEARTRTE,
+##         GLUCOSE,
+##         CVD      = as.ordered(CVD),
+##         SEX      = ordered(SEX, levels=c(1,2), labels=c("M", "F")),
+##         educ     = as.ordered(educ),
+##         DIABETES = as.ordered(DIABETES),
+##         BPMEDS   = as.ordered(BPMEDS),
+##         PREVAP   = as.ordered(PREVAP),
+##         PREVMI   = as.ordered(PREVMI),
+##         PREVSTRK = as.ordered(PREVSTRK),
+##         PREVHYP  = as.ordered(PREVHYP),
+##         .keep="none"
+##     )
+## ## select(CVD, SEX, AGE, educ, TOTCHOL, SYSBP, CIGPDAY, BMI, DIABETES,
+## ##        BPMEDS, HEARTRTE, GLUCOSE, PREVAP, PREVMI, PREVSTRK, PREVHYP)
 
 
 
