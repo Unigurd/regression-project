@@ -9,16 +9,54 @@ library(tidyr)
 library(hexbin)
 library(ggplot2)
 
-## In order for us to use assumption A4 about the values of CVD being uncorrelated conditioned on the other variables, we need to get rid of all but one observation for each person. Otherwise there will be an obvious correlation between the values of CVD for the observations of the same person: They will be the same. We do this now so that when we start plotting the distributions of our variables we can better justify thinking of each observation as independent, making the plots easier to interpret.
+library(riskCommunicator)
+data(framingham, package="riskCommunicator")
 
-## The simplest would be to just keep the observations from the first checkup, but we would like to see if we can squeeze a bit more out of the data. We can check whether some people had their first checkup in the second or third period:
+
+input <- as_tibble(read.csv("training_data.csv"))
+
 set.seed(8088)
-framingham1 <- as_tibble(read.csv("training_data.csv"))
-table((framingham1 |> mutate(firstp=min(PERIOD), .by=RANDID) |> distinct(RANDID, .keep_all=1))$firstp)
-## So we can potentially increase our dataset by around 10% if we use these observations too. But since their first checkup was later, they would have been observed for a shorter time, and it would thus be less likely that a CVD event would have occurred. We therefore need to make sure that the observations we choose don't have too small an observation period so our estimates of CVD probabilities don't get skewed downwards. We would have had to do the same if we only used observations from the first checkup, using later observations just makes the effect more pronounced.
+n               <- nrow(framingham)
+validation_size <- floor(n/10)
+i               <- sample(n, validation_size)
+validation_data <- framingham[i,]
+training_data   <- framingham[-i,]
 
-## To do this we notice in the documentation of the data set that all the time-to-event columns like TIMECVD, TIMEDTH and so on register the real censoring time for each subject when the given event didn't occur. We have checked that these are all in agreement except for TIMEDTH which sometimes has the end-of-followup time even when the other time-to-event columns indicate the subject was lost to followup before that. The following piece of code calculates the observation duration. The variable TIME records the time since the baseline exams in period 1, regardless of whether a person had an exam then. We therefore need to subtract it.
-framingham2 <- framingham1 |>
+framingham_ordered_cols <- function(data) {
+    data |>
+        mutate(
+            SEX      = ordered(SEX, levels=c(1,2), labels=c("M", "F")),
+            CURSMOKE = as.ordered(CURSMOKE),
+            DIABETES = as.ordered(DIABETES),
+            BPMEDS   = as.ordered(BPMEDS),
+            ## We don't actually know what education the educ levels stand for,
+            ## but we assume they're ordered.
+            educ     = as.ordered(educ),
+            PREVCHD  = as.ordered(PREVCHD),
+            PREVAP   = as.ordered(PREVAP),
+            PREVMI   = as.ordered(PREVMI),
+            PREVSTRK = as.ordered(PREVSTRK),
+            PREVHYP  = as.ordered(PREVHYP),
+            PERIOD   = as.ordered(PERIOD),
+            DEATH    = as.ordered(DEATH),
+            ANGINA   = as.ordered(ANGINA),
+            HOSPMI   = as.ordered(HOSPMI),
+            MI_FCHD  = as.ordered(MI_FCHD),
+            ANYCHD   = as.ordered(ANYCHD),
+            STROKE   = as.ordered(STROKE),
+            CVD      = as.ordered(CVD),
+            HYPERTEN = as.ordered(HYPERTEN),
+            )
+}
+
+real_validation_data <- validation_data |> filter(PERIOD == 1) |> select(RANDID) |> distinct() |> left_join(framingham, by=join_by(RANDID)) |> framingham_ordered_cols()
+framingham1          <- training_data   |> filter(PERIOD == 1) |> select(RANDID) |> distinct() |> left_join(framingham, by=join_by(RANDID)) |> framingham_ordered_cols()
+
+## In order for us to use assumption A4 about the values of CVD being uncorrelated conditioned on the other variables, we need to get rid of all but one observation for each person. Otherwise there will be an obvious correlation between the values of CVD for the observations of the same person: They will be the same. We do this now so that when we start plotting the distributions of our variables we can better justify thinking of each observation as independent, making the plots easier to interpret. We cannot use the observations where the first checkup we have for a person is from period 2 or 3, since it will not be independent of any observations from earlier periods for that person that may be in the validation data. We therefore just us the observations from the baseline exam.
+framingham2 <- framingham1 |> filter(PERIOD == 1)
+
+## We also don't want to include people who dropped out of the study too early, as they had less time to get CVD, thus skewing our predictions for probability of getting CVD downwards. To do this we notice in the documentation of the data set that all the time-to-event columns like TIMECVD, TIMEDTH and so on register the real censoring time for each subject when the given event didn't occur. We have checked that these are all in agreement except for TIMEDTH which sometimes has the end-of-followup time even when the other time-to-event columns indicate the subject was lost to followup before that. The following piece of code calculates the observation duration under the assumption that TIME is always 0 in period 1 observations, which we have checked.
+framingham3 <- framingham2 |>
     mutate(
         timeap   = ifelse(ANGINA   == 1, -1, TIMEAP),
         timemi   = ifelse(HOSPMI   == 1, -1, TIMEMI),
@@ -32,110 +70,72 @@ framingham2 <- framingham1 |>
         ## In that case we use TIMEDTH instead, since it contains the time of last contact
         ## with some person (or maybe a larger value as we saw above, but it's still our
         ## best guess) if the person didnt die, and also if the person did die.
-        time_to_cvd    = TIMECVD-TIME,
-        time_censor    = ifelse(max == -1, TIMEDTH, max),
-        time_to_censor = time_censor-TIME,
+        time_censor = ifelse(max == -1, TIMEDTH, max),
         .after=RANDID
     ) |>
     subset(select=-c(max, timeap, timemi, timemifc, timechd, timestrk, timecvd, timehyp))
 
-framingham3 <- framingham2 |> filter(PERIOD == min(PERIOD), .by=RANDID)
+## Now we can remove any observations from people who dropped out of the study before the halfway mark. The halfway mark was chosen pretty arbitrarily.
+framingham4 <- framingham3 |> filter(time_censor > 12*365.25)
 
-## All the people are represented
-all(unique(framingham2$RANDID) == unique(framingham3$RANDID))
-# exactly once.
-n_distinct(framingham2$RANDID) == nrow(framingham3)
+## A lot of the columns can already be ruled out as potential predictors. Either they're meaningless like RANDINT, or indicate a future event from the point of the baseline exam, or the time until a future event. This leaves us with the following potential predictors:
 
-framingham4 <- framingham3 |> filter(time_to_censor > 12*365.25, time_to_cvd >= 0)
-
-# Drop all irrelevant columns here
-framingham5 <- framingham4 |>
-    mutate(
-        AGE,
-        TOTCHOL,
-        SYSBP,
-        DIABP,
-        CIGPDAY,
-        BMI,
-        HEARTRTE,
-        GLUCOSE,
-        CVD      = as.ordered(CVD),
-        SEX      = ordered(SEX, levels=c(1,2), labels=c("M", "F")),
-        educ     = as.ordered(educ),
-        CURSMOKE = as.ordered(CURSMOKE),
-        DIABETES = as.ordered(DIABETES),
-        BPMEDS   = as.ordered(BPMEDS),
-        PREVCHD  = as.ordered(PREVCHD),
-        PREVAP   = as.ordered(PREVAP),
-        PREVMI   = as.ordered(PREVMI),
-        PREVSTRK = as.ordered(PREVSTRK),
-        PREVHYP  = as.ordered(PREVHYP),
-        .keep="none"
-    )
-    ## select(-c(
-    ##             ## Not measurements of a person
-    ##             X, RANDID, time_to_cvd, time_censor, time_to_censor, TIME, PERIOD,
-    ##             ## Only measured in the third checkup
-    ##             HDLC, LDLC,
-    ##             ## We cannot use something happening in the future to predict.
-    ##             DEATH, ANGINA, HOSPMI, MI_FCHD, ANYCHD, STROKE, HYPERTEN,
-    ##             TIMEAP, TIMEMI, TIMEMIFC, TIMECHD, TIMESTRK, TIMECVD, TIMEDTH, TIMEHYP))
-
-
-
-## Move conversion to factors up here for nicer plotting
-
+## We're now ready to examine the marginal distributions of the continuous variables:
+dens1 <- ggplot(data=framingham4) + geom_density(fill=gray(0.7))
 gridExtra::grid.arrange(
-               ggplot(data=framingham5, aes(TOTCHOL))  + geom_density(fill=gray(0.7)),
-               ggplot(data=framingham5, aes(AGE))      + geom_density(fill=gray(0.7)),
-               ggplot(data=framingham5, aes(SYSBP))    + geom_density(fill=gray(0.7)),
-               ggplot(data=framingham5, aes(DIABP))    + geom_density(fill=gray(0.7)),
-               ggplot(data=framingham5, aes(CIGPDAY))  + geom_density(fill=gray(0.7)),
-               ggplot(data=framingham5, aes(BMI))      + geom_density(fill=gray(0.7)),
-               ggplot(data=framingham5, aes(HEARTRTE)) + geom_density(fill=gray(0.7)),
-               ggplot(data=framingham5, aes(GLUCOSE))  + geom_density(fill=gray(0.7)),
+               dens1 + aes(TOTCHOL),  dens1 + aes(AGE),
+               dens1 + aes(SYSBP),    dens1 + aes(DIABP),
+               dens1 + aes(CIGPDAY),  dens1 + aes(BMI),
+               dens1 + aes(HEARTRTE), dens1 + aes(GLUCOSE),
                ncol=4
            )
 
+## We notice that GLUCOSE, BMI and mayyybe HEARTRTE, SYSBP and DIABP have skewed distributions, making them candidates for transformations, maybe by a logarithm. We do not have the domain knowledge to say whether this makes sense, but on an intuitive level it makes sense that if something can vary like glucose does, then it's not whether the glucose measurements differ by e.g. 10 that matters, but whether the measurements double or triple (This shouldn't be understood in a causative sense, naturally). So in this sense a log transform seems reasonable. We note that CIGPDAY is very skewed, but don't commit to any transformation of it yet.
+
+## The log-transforms of the variables look much more reasonable, so we stick with that for now. The only one that doesn't improve much is GLUCOSE, and it keeps having a large tail regardless of how much we log-transform it. Maybe it's an extreme outlier causing the tail then.
 gridExtra::grid.arrange(
-               ggplot(data=framingham5, aes(SEX))      + geom_bar(fill=gray(0.7)),
-               ggplot(data=framingham5, aes(CURSMOKE)) + geom_bar(fill=gray(0.7)),
-               ggplot(data=framingham5, aes(DIABETES)) + geom_bar(fill=gray(0.7)),
-               ggplot(data=framingham5, aes(BPMEDS))   + geom_bar(fill=gray(0.7)),
-               ggplot(data=framingham5, aes(educ))     + geom_bar(fill=gray(0.7)),
-               ggplot(data=framingham5, aes(PREVCHD))  + geom_bar(fill=gray(0.7)),
-               ggplot(data=framingham5, aes(PREVAP))   + geom_bar(fill=gray(0.7)),
-               ggplot(data=framingham5, aes(PREVMI))   + geom_bar(fill=gray(0.7)),
-               ggplot(data=framingham5, aes(PREVSTRK)) + geom_bar(fill=gray(0.7)),
-               ggplot(data=framingham5, aes(PREVHYP))  + geom_bar(fill=gray(0.7)),
-               ggplot(data=framingham5, aes(CVD))      + geom_bar(fill=gray(0.7)),
-               ncol=4
+               dens1 + aes(log(SYSBP)),   dens1 + aes(log(DIABP)),
+               dens1 + aes(log(BMI)),     dens1 + aes(log(HEARTRTE)),
+               dens1 + aes(log(GLUCOSE)), dens1 + aes(log(log(GLUCOSE))),
+               dens1 + aes(log(log(log(GLUCOSE)))), ncol=4
+           )
+
+## All of our categorical variables except educ are binary. educ tapers off to the right so higher numbers likely corresponds to higher levels of education, which was our assumption as well. There are some missing values we wil need to handle, but the most striking thing is how skewed DIABETES, BPMEDS, PREVCHD, PREVAP, PREVMI and PREVSTRK are. The latter two in particular seem to have so few occurrences that they're candidates for being thrown out. If we don't have enough observations where MI or CHD, we cannot say anything about their effect with certainty anyway.
+bar1 <- ggplot(data=framingham4) + geom_bar(fill=gray(0.7))
+gridExtra::grid.arrange(
+               bar1 + aes(SEX),      bar1 + aes(CURSMOKE),
+               bar1 + aes(DIABETES), bar1 + aes(BPMEDS),
+               bar1 + aes(educ),     bar1 + aes(PREVCHD),
+               bar1 + aes(PREVAP),   bar1 + aes(PREVMI),
+               bar1 + aes(PREVSTRK), bar1 + aes(PREVHYP),
+               bar1 + aes(CVD),      ncol=4
            )
 
 
-# Taken from the book chapter 3
+framingham4_log <- framingham4 |>
+    mutate(log(GLUCOSE), log(DIABP), log(SYSBP), log(BMI)) |>
+    select(-c(GLUCOSE, DIABP, SYSBP, BMI))
+
+
+# Examining the correlation between our continuous variable, the strong colinearity of SYSBP and DIABP immediately catches the eye. One of them has to go, and we choose DIABP because it has higher correlation with BMI, the variables that both are second-most correlated to. No other correlations are high enough to remove variables at this point, but this plot does give us a convenient view of outliers. In particular, the tail of GLUCOSE is not caused by a few outliers, but rather it seems like a real trend in the data. Other than that, there are points that lie away from the other, but none that really necessitate removal.
 ggally_hexbin <- function(data, mapping, ...) {
-                                               ggplot(data, mapping) + stat_binhex(...)
-                                               }
+    ggplot(data, mapping) + stat_binhex(...)
+}
 
-
-# We see that SYSBP and DIABP are the most correlated with a Corr score of 0.722.
-# We see a single outlier for HEARTRTE, four for TOTCHOL, maybe some for SYSBP?
-# So we should maybe pick DIABP over it?
-# CIGPDAY and educ are very skewed, as are most of the binary factors.
-# Should we make groupings for CIGPDAY?
-# Should we make groupings for time_to_censor? four of them?
 GGally::ggpairs(
-            framingham5,
-            columns = c("AGE", "TOTCHOL", "SYSBP",
-                        "DIABP", "CIGPDAY", "BMI", "HEARTRTE", "GLUCOSE"),
+            framingham4_log,
+            columns = c("AGE", "TOTCHOL", "log(SYSBP)", "log(DIABP)",
+                        "CIGPDAY", "log(BMI)", "HEARTRTE", "log(GLUCOSE)"),
             lower   = list(continuous = GGally::wrap("hexbin", bins=20)),
             diag = list(continuous = "blankDiag")
         )
 
 
+## Since all our categorical variables conveniently are ordered, we use the spearman correlation to get an idea of the correlation of all of our potentials predictors. There is naturally a strong correlation between CURSMOKE and CIGPDAY. If we believe that smoking any cigarettes at all is qualitatively different than not smoking we might choose to include both, but we don't have much reason to believe so we get rid of CURSMOKE.
 cp <- cor(
-    data.matrix(framingham5),
+    framingham4 |> select(AGE, TOTCHOL, log(SYSBP), log(DIABP),
+                          CIGPDAY, log(BMI), HEARTRTE, log(GLUCOSE))
+    |> data.matrix(),
     use    = "complete.obs",
     method = "spearman"
 )
@@ -149,112 +149,111 @@ corrplot::corrplot(
               tl.cex  = 0.8
           )
 
-density_by_cvd_legend <- ggplot(data=framingham5, aes(fill=as.factor(CVD)))  + geom_density(alpha=0.4)
+## PREVCHD is very correlated to both PREVMI and PREVAP. Reading their descriptions we see that PREVAP is PREValent Angina Pectoris, PREVMI is PREValent Myocardial Infarction, and that PREVCHD is either of those or prevalent coronary insufficiency. Checking the data, we indeed see that PREVCHD is always 1 whenever PREVAP or PREVMI is, and that we only have two cases of PREVCHD that is not also PREVAP or PREVMI, that is, cases that we know must be prevalent coronary insufficiency. That is not information enough to sensibly impute prevalent coronary insufficiency for all the observations where either PREVAP or PREVMI is 1, so we just get rid of PREVCHD wholesale.
+framingham4 |> filter(PREVCHD == 0, PREVMI == 1 | PREVAP == 1) |> nrow()
+framingham4 |> filter(PREVCHD == 1, PREVMI == 0,  PREVAP == 0) |> nrow()
+
+## The last strongly correlated group is SYSBP, DIABP and PREVHYP. We have already gotten rid of DIABP, and looking at a plot of smoothed CVD probability stratified by PREVHYP, we don't really see any reason to keep PREVHYP. The behavior seems exactly the same, just more fluctuating for PREVHYP=1 due to the fewer observations.
+ggplot(framingham4, aes(log(SYSBP), as.numeric(CVD), color=PREVHYP, fill=PREVHYP)) + geom_smooth(alpha=0.5, method="loess")
+
+## CVD didn't really seem strongly correlated with anything so we plot the density of the continuous variables stratified by CVD.
+density_by_cvd_legend <- ggplot(data=framingham4, aes(fill=as.factor(CVD)))  + geom_density(alpha=0.4)
 density_by_cvd        <- density_by_cvd_legend + theme(legend.position="none")
 gridExtra::grid.arrange(
-               density_by_cvd + aes(TOTCHOL),  density_by_cvd + aes(AGE),
-               density_by_cvd + aes(SYSBP),    density_by_cvd + aes(DIABP),
-               density_by_cvd + aes(CIGPDAY),  density_by_cvd + aes(BMI),
-               density_by_cvd + aes(HEARTRTE), density_by_cvd + aes(GLUCOSE),
-               ncol=4
+               density_by_cvd + aes(TOTCHOL),    density_by_cvd + aes(AGE),
+               density_by_cvd + aes(log(SYSBP)), density_by_cvd_legend + aes(CIGPDAY),
+               density_by_cvd + aes(log(BMI)),   density_by_cvd + aes(HEARTRTE),
+               density_by_cvd + aes(log(GLUCOSE)), ncol=4
            )
+## We see that some of the variables have their distribution translated slightly higher when CVD=1, but the biggest change is that risk of CVD clearly increases with age.
 
-side_bars_legend <- ggplot(data=framingham5, aes(SEX, fill=CVD)) + geom_bar(position="dodge", alpha=0.7)
-side_bars        <- side_bars_legend + theme(legend.position="none")
+## Looking at barplots of the relative frequencies of CVD for the different values of the categorical variables, we see that a lot of the rare conditions indicate a great increase in the risk of CVD. PREVMI and PRESTRK in particular, which were the ones we considered removing because there were so few instances of them happening. Seeing this, we'll keep them in.
+stacked_bars_legend <- ggplot(data=framingham4, aes(SEX, fill=CVD)) + geom_bar(position="fill", alpha=0.7) + ylab("")
+stacked_bars        <- stacked_bars_legend + theme(legend.position="none")
 gridExtra::grid.arrange(
-               side_bars + aes(SEX),         side_bars + aes(CURSMOKE),
-               side_bars + aes(DIABETES),    side_bars + aes(BPMEDS),
-               side_bars_legend + aes(educ), side_bars + aes(PREVCHD),
-               side_bars + aes(PREVAP),      side_bars + aes(PREVMI),
-               side_bars + aes(PREVSTRK),    side_bars + aes(PREVHYP),
-               ncol=5
-           )
-
-stacked_bars_legend <- ggplot(data=framingham5, aes(fill=CVD)) + geom_bar(position="fill", alpha=0.7)
-stacked_bars<- stacked_bars_legend + theme(legend.position="none")
-gridExtra::grid.arrange(
-               stacked_bars + aes(PREVCHD), stacked_bars + aes(PREVAP),
-               stacked_bars + aes(PREVMI), stacked_bars + aes(PREVSTRK),
-               stacked_bars_legend + aes(PREVHYP),
+               stacked_bars + aes(SEX),         stacked_bars + aes(CURSMOKE),
+               stacked_bars + aes(DIABETES),    stacked_bars + aes(BPMEDS),
+               stacked_bars_legend + aes(educ), stacked_bars + aes(PREVCHD),
+               stacked_bars + aes(PREVAP),      stacked_bars + aes(PREVMI),
+               stacked_bars + aes(PREVSTRK),    stacked_bars + aes(PREVHYP),
                ncol=5
            )
 
 
-## Maybe remove PREVHYP too? It has high correlation with SYSBP.
-framingham6 <- framingham5 |> select(-c(CURSMOKE, DIABP, PREVCHD))
-
-
-framingham6 |>
+## Examining the missing values in our data, we see that GLUCOSE represents most of them. It makes sense that CIGPDAY and BMI are more likely to be missing when they're high, which would make them MNAR and thus not really possible to impute. We don't really have a reason to suspect any of the other columns are MNAR, so we will impute them
+framingham4 |>
     skim() |>
     select(skim_variable, n_missing) |>
-    filter(n_missing != 0) |>
+    filter(n_missing != 0, skim_variable != "HDLC", skim_variable != "LDLC") |>
     arrange(desc(n_missing))
 
-table(rowSums(is.na(framingham6)))
+## Luckily the missing CIGPDAY and BMI consist of less than 0.001 of the data, so if we impute the rest we
+sum(is.na(framingham4$CIGPDAY) | is.na(framingham4$BMI))/nrow(framingham4)
 
-cona6 <- framingham6 |>
+table(rowSums(is.na(framingham4)))
+
+cona4 <- framingham4 |>
     select(TOTCHOL, CIGPDAY, BPMEDS, GLUCOSE, educ)|>
-    filter(rowSums(is.na(framingham6)) >= 2) |>
-    ## print(n=64)
+    filter(rowSums(is.na(framingham4)) >= 2) |>
     as.matrix() |>
     is.na() |>
     crossprod()
-round(sweep(cona6, 1, diag(cona6), "/"), 2)
+round(sweep(cona4, 1, diag(cona4), "/"), 2)
 
 
-framingham7 <- framingham6 |>
-    filter(!is.na(CIGPDAY), !is.na(BMI))
+period1 <- framingham1 |> filter(PERIOD == 1)
+period2 <- framingham1 |> filter(PERIOD == 2) |>
+    mutate(RANDID, CURSMOKE2=CURSMOKE, CIGPDAY2=CIGPDAY, BMI2=BMI,
+           TOTCHOL2=TOTCHOL, BPMEDS2=BPMEDS, educ2=educ, GLUCOSE2=GLUCOSE,
+           .keep="none"
+           )
+period3 <- framingham1 |> filter(PERIOD == 3) |>
+    mutate(RANDID, CURSMOKE3=CURSMOKE, CIGPDAY3=CIGPDAY, BMI3=BMI,
+           TOTCHOL3=TOTCHOL, BPMEDS3=BPMEDS, educ3=educ, GLUCOSE3=GLUCOSE,
+           LDLC3=LDLC, HDLC3=HDLC,
+           .keep="none"
+)
 
-framingham7 |>
-    skim() |>
-    select(skim_variable, n_missing) |>
-    filter(n_missing != 0) |>
-    arrange(desc(n_missing))
+## Add prevhyp and hyperten to impute BPMEDS.
+## Don't bother with the other educs. They're all na if the first is na.
 
-table(rowSums(is.na(framingham7)))
+framingham5 <- period1 |>
+    left_join(period2, by=join_by(RANDID)) |>
+    left_join(period3, by=join_by(RANDID))
 
-framingham7 |>
-    select(TOTCHOL, BPMEDS, GLUCOSE, educ)|>
-    filter(rowSums(is.na(framingham7)) >= 2) |>
-    print(n=54)
+framingham7 <- framingham5
+## Why are there more missing BMIs here than in framingham4? Oh
+## because we've filtered rows with a short time off. We should
+## probably because this on that, rather than framingham1.
+## Not much to impute from though.
+framingham7 |> filter(is.na(BMI)) |> mutate(B2=!is.na(BMI2), B3=!is.na(BMI3), .keep="none") |> table()
+## Looks a bit better here. There might still be too many missing in
+## GLUCOSE2 and GLUCOSE3 for it to be worth the time.
+framingham7 |> filter(is.na(GLUCOSE)) |> mutate(B2=!is.na(GLUCOSE2), B3=!is.na(GLUCOSE3), .keep="none") |> table()
+## Nothing to gain from educ.
+framingham7 |> filter(is.na(educ)) |> mutate(B2=!is.na(educ), B3=!is.na(educ3), .keep="none") |> table()
+## All nas in BPMEDS2
+framingham7 |> filter(is.na(BPMEDS)) |> mutate(B2=!is.na(BPMEDS), B3=!is.na(BPMEDS3), .keep="none") |> table()
+## All nas in TOTCHOL2
+framingham7 |> filter(is.na(TOTCHOL)) |> mutate(B2=!is.na(TOTCHOL), B3=!is.na(TOTCHOL3), .keep="none") |> table()
+## All nas in CIGPDAY2
+framingham7 |> filter(is.na(CIGPDAY)) |> mutate(B2=!is.na(CIGPDAY), B3=!is.na(CIGPDAY3), .keep="none") |> table()
 
-
-## ## TODO: remove outliers
-## framingham7 <- framingham6 |>
-##     mutate(
-##         AGE,
-##         TOTCHOL,
-##         SYSBP,
-##         CIGPDAY,
-##         BMI,
-##         HEARTRTE,
-##         GLUCOSE,
-##         CVD      = as.ordered(CVD),
-##         SEX      = ordered(SEX, levels=c(1,2), labels=c("M", "F")),
-##         educ     = as.ordered(educ),
-##         DIABETES = as.ordered(DIABETES),
-##         BPMEDS   = as.ordered(BPMEDS),
-##         PREVAP   = as.ordered(PREVAP),
-##         PREVMI   = as.ordered(PREVMI),
-##         PREVSTRK = as.ordered(PREVSTRK),
-##         PREVHYP  = as.ordered(PREVHYP),
-##         .keep="none"
-##     )
-## ## select(CVD, SEX, AGE, educ, TOTCHOL, SYSBP, CIGPDAY, BMI, DIABETES,
-## ##        BPMEDS, HEARTRTE, GLUCOSE, PREVAP, PREVMI, PREVSTRK, PREVHYP)
-
-
-
-impute_form <- ~ CVD + SEX + TOTCHOL + AGE + SYSBP +
-    CIGPDAY + DIABETES + HEARTRTE + PREVAP + PREVMI +
-    PREVSTRK + PREVHYP + BMI + BPMEDS + GLUCOSE + educ
-
-## Set n.impute accordingly later
-reformM(impute_form, framingham7)
+## We have removed PREVSTRK because it gave issues because bootstrap resamples would have too few unique values of it.
+impute_form <- reformM(
+    ~ CVD + SEX + TOTCHOL + AGE + SYSBP +
+        CIGPDAY + DIABETES + HEARTRTE + PREVAP + PREVMI +
+        + PREVHYP + BMI + BPMEDS + GLUCOSE + educ +
+        CURSMOKE2 + CIGPDAY2 + BMI2 + TOTCHOL2 + BPMEDS2 + educ2 + GLUCOSE2 +
+        CURSMOKE3 + CIGPDAY3 + BMI3 + TOTCHOL3 + BPMEDS3 + educ3 + GLUCOSE3 +
+        LDLC3 + HDLC3,
+    framingham5
+)
 
 imp <- aregImpute(
     impute_form,
     framingham7,
+    # Set n.impute to proper value later
     n.impute=5,
     nk=4
 )
@@ -301,6 +300,8 @@ impute.all <- function(form, data, var, k, n.impute=5, nk=4) {
 
 
 imputed_glucose <- impute.all(impute_form, framingham7, "GLUCOSE", k=10)
+write.csv(imputed_glucose, "imputed_glucose.csv")
+
 
 imputed_educ <- impute.all(impute_form, framingham7, "educ", k=10, nk=0)
 
