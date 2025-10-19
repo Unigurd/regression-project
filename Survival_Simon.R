@@ -1,9 +1,13 @@
+# look to towards the end of this file for analysis that actually makes sense (the survreg part)
 library(dplyr)
 library(ggplot2)
 library(survival)
 library(tidyr)
 library(broom)
 library(ggbeeswarm)
+library(ggsurvfit)
+library(flexsurv)
+library(survminer)
 
 setwd("C:/Users/SIMON/Desktop/GitHub/regression-project")
 surv_data <- read.csv("training_data.csv") %>%
@@ -20,7 +24,6 @@ surv_data_final <- surv_data %>%
     SYSBP < 250,
   ) |>
   mutate(Prev_sick = ifelse(PREVCHD == 1 | PREVAP == 1 | PREVMI == 1 | PREVSTRK == 1 | PREVHYP == 1 , 1, 0)) |>
-  select(-c("PREVCHD", "PREVAP", "PREVMI", "PREVSTRK", "PREVHYP")) |>
   drop_na()
 
 # check distribution of TIMECVD
@@ -162,6 +165,11 @@ surv_reg_prev <- survreg(
 )
 surv_reg_prev
 
+# below I do the Cox regression model BUT we actually CANNOT use it because the two key assumptions are 
+# non-informative censoring
+# proportional hazards: this is not satisfied as we showed in theory part
+# we can adjust for this by adding tt(age) apparently, or rstpm2: stpm2
+
 surv_reg_cox <- coxph(
   Surv(TIMECVD + 0.5, CVD == 1) ~ Prev_sick,
   data = surv_data_final
@@ -213,3 +221,78 @@ pred_frame <- tibble(
       width = 0.15, 
       linewidth = 0.7
     )
+
+  #---------
+  # new approach using ggsurvfit (from https://www.emilyzabor.com/survival-analysis-in-r.html)
+  s1 <- survfit(Surv(TIMECVD, CVD) ~ 1, data = surv_data_final)
+str(s1) 
+
+survfit2(Surv(TIMECVD, CVD) ~ 1, data = surv_data_final) %>%
+  ggsurvfit() +
+  labs(
+    x = "Days",
+    y = "Overall survival probability"
+  ) + 
+  add_confidence_interval() +
+  add_risktable()
+
+summary(survfit(Surv(TIMECVD, CVD) ~ 1, data = surv_data_final), times = 3652.5)
+
+#-----------------------------
+# Proper approach using survreg
+# start off by using same regressors as in my extended model from logmodel_firsteps
+# add +0.5 to survival time to account for log(0) problem
+reg_log <- survreg(formula = Surv(TIMECVD +0.1 , CVD) ~ .,
+        data = surv_data_final, 
+        dist = "loglogistiC") # can try this also with dist = one of the following:
+# “extreme”, “logistic”, “gaussian”, “weibull”, “exponential”, “rayleigh”, “loggaussian”, “lognormal”, “loglogistic”, “t”
+
+# residual plots
+p1 <- augment(reg_log, data = surv_data_final, type.predict = "expected") |>
+  survfit(Surv(.fitted, CVD == 1) ~ 1, data = _) |>
+  summary(data.frame = TRUE) |>
+  ggplot(aes(time, cumhaz)) + 
+  geom_abline(slope = 1, color = "blue") +
+  geom_point() +
+  xlab("Cox-Snell residuals") + 
+  ylab("Cumulative hazard") +
+
+
+p2 <- augment(reg_log) |> 
+  ggplot(aes(.fitted, .resid)) +
+  geom_point(alpha = 0.4) + 
+  geom_smooth() + 
+  xlab("Fitted values") +
+  ylab("Martingale residuals")
+
+gridExtra::grid.arrange(p1, p2, ncol = 2)
+
+# AGE vs. resids
+augment(reg_log, data = surv_data_final) %>%
+  ggplot(aes(AGE, .resid)) +
+  geom_point() +
+  geom_smooth() +
+  geom_errorbar(
+    stat = "summary", 
+    fun.data = mean_se, 
+    fun.args = list(mult = 1.96),
+    color = "blue", 
+    width = 0.15, 
+    linewidth = 0.7
+  )
+
+# Cox-Snell residuals look like log?
+# From chap. 11.5.1:
+# n practice we plot the estimated cumulative hazards against the Cox-Snell residuals,
+# which should fall on a straight line with slope 1
+
+# Some model suggestions:
+form <- Surv(TIMECVD + 0.1, CVD) ~ AGE + SEX + TOTCHOL + SYSBP + PREVCHD + CIGPDAY + DIABETES + BMI
+
+fits <- list(
+  weibull = flexsurvreg(form, data = surv_data_final, dist = "weibull"),
+  lognormal = flexsurvreg(form, data = surv_data_final, dist = "lnorm"),
+  loglogistic = flexsurvreg(form, data = surv_data_final, dist = "llogis"),
+  gengamma = flexsurvreg(form, data = surv_data_final, dist = "gengamma")
+)
+
