@@ -769,6 +769,25 @@ table5 <- drop1(model2, test="LRT") |>
 
 cat(table5, file="resources/table5.txt", sep="\n")
 
+table5.5 <- tidy(model2, conf.int=TRUE)[-1, c("term", "conf.low", "estimate", "conf.high")] |>
+    arrange(estimate) |>
+    mutate(
+        `estimate 2.5%` = `conf.low`,
+        `estimate 97.5%`= `conf.high`,
+        `OR 2.5%`       = exp(`estimate 2.5%`),
+        `OR`            = exp(estimate),
+        `OR 97.5%`      = exp(`estimate 97.5%`),
+        `conf.low`      = NULL,
+        `conf.high`     = NULL,
+        ) |>
+    relocate(estimate, .after=`estimate 2.5%`) |>
+    mutate(term=gsub("(,[^)]+)", "", term)) |>
+    ## filter(grepl("^ns", term)) |>
+    knitr::kable(digits=2)
+
+
+cat(table5.5, file="resources/table5.5.txt", sep="\n")
+
 ## The calibration plots of the new model looks similar to the plots
 ## for the additive model and so we don't show them. But now we have
 ## two models we can compare their predictive power!
