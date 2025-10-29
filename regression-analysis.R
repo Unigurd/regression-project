@@ -989,15 +989,17 @@ cat(table7, file="resources/table7.txt", sep="\n")
 table8 <- tidy(model3, conf.int=TRUE)[-1, c("term", "conf.low", "estimate", "conf.high")] |>
     arrange(estimate) |>
     mutate(
-        `estimate 2.5%` = `conf.low`,
-        `estimate 97.5%`= `conf.high`,
-        `OR 2.5%`       = exp(`estimate 2.5%`),
-        `OR`            = exp(estimate),
-        `OR 97.5%`      = exp(`estimate 97.5%`),
+        `estim. 2.5%`   = `conf.low`,
+        `estim.`        = `estimate`,
+        `estim. 97.5%`  = `conf.high`,
+        `OR 2.5%`       = exp(`estim. 2.5%`),
+        `OR`            = exp(estim.),
+        `OR 97.5%`      = exp(`estim. 97.5%`),
         `conf.low`      = NULL,
         `conf.high`     = NULL,
+        `estimate`      = NULL,
         ) |>
-    relocate(estimate, .after=`estimate 2.5%`) |>
+    ## relocate(estim., .after=`estim. 2.5%`) |>
     knitr::kable(digits=2)
 
 cat(table8, file="resources/table8.txt", sep="\n")
