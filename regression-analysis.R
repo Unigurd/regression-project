@@ -593,21 +593,22 @@ ggsave("resources/cal1.pdf", p16, width=5000, height=2000, units="px")
 ## signs of this too with the left tail going up a bit. We want to
 ## examine this.
 
-estimate_plot <- function(model_diag, var) {
+estimate_plot <- function(model_diag, var, xlab) {
     ggplot(data=model_diag, aes(!!var)) +
         geom_smooth(aes(y=as.numeric(CVD)-1, color="Observed"), fill="blue", alpha=0.2, method="loess") +
         geom_smooth(aes(y=.fitted, color="Fitted"),   fill="red",  alpha=0.2, method="loess") +
         geom_point(aes(y=as.numeric(CVD)-1), alpha=0.2) +
         scale_color_manual(values=c("Observed" = "blue", "Fitted"="red")) +
+        xlab(xlab) +
         labs(color="Type")
 }
 
 model1_diag2 <- augment(model1, type.predict="response", type.residuals = "pearson")
 p17 <- gridExtra::grid.arrange(
-    estimate_plot(model1_diag2, model1_diag2$`log(BMI)`),
-    estimate_plot(model1_diag2, model1_diag2$`log(GLUCOSE)`),
-    estimate_plot(model1_diag2, model1_diag2$SYSBP),
-    estimate_plot(model1_diag2, model1_diag2$`log(HEARTRTE)`),
+    estimate_plot(model1_diag2, model1_diag2$`log(BMI)`, xlab="log(BMI)"),
+    estimate_plot(model1_diag2, model1_diag2$`log(GLUCOSE)`, xlab="log(GLUCOSE)"),
+    estimate_plot(model1_diag2, model1_diag2$SYSBP, xlab="SYSBP"),
+    estimate_plot(model1_diag2, model1_diag2$`log(HEARTRTE)`, xlab="log(HEARTRTE)"),
     ncol=4)
 
 ggsave("resources/estim1.pdf", p17, width=5000, height=2000, units="px")
@@ -874,10 +875,10 @@ auc2 <- auc(model2)
 model2_diag2 <- augment(model2, type.predict="response", type.residuals = "pearson")
 
 p24 <- gridExtra::grid.arrange(
-    estimate_plot(model2_diag2, log(plotting_data$BMI)),
-    estimate_plot(model2_diag2, log(plotting_data$GLUCOSE)),
-    estimate_plot(model2_diag2, plotting_data$SYSBP),
-    estimate_plot(model2_diag2, log(plotting_data$HEARTRTE)),
+    estimate_plot(model2_diag2, log(plotting_data$BMI), xlab="log(BMI)"),
+    estimate_plot(model2_diag2, log(plotting_data$GLUCOSE), xlab="log(GLUCOSE)"),
+    estimate_plot(model2_diag2, plotting_data$SYSBP, xlab="SYSBP"),
+    estimate_plot(model2_diag2, log(plotting_data$HEARTRTE), xlab="log(HEARTRTE)"),
     ncol=4)
 
 ggsave("resources/estim2.pdf", p24, width=5000, height=2000, units="px")
@@ -989,9 +990,9 @@ cat(table8, file="resources/table8.txt", sep="\n")
 model3_diag2 <- augment(model3, type.predict="response", type.residuals = "pearson")
 
 p27 <- gridExtra::grid.arrange(
-    estimate_plot(model3_diag2, log(plotting_data$BMI)),
-    estimate_plot(model3_diag2, log(plotting_data$GLUCOSE)),
-    ncol=4)
+    estimate_plot(model3_diag2, log(plotting_data$BMI), xlab="log(BMI)"),
+    estimate_plot(model3_diag2, log(plotting_data$GLUCOSE), xlab="log(GLUCOSE)"),
+    nrow=1)
 
 ggsave("resources/estim3.pdf", p27, width=5000, height=2000, units="px")
 
