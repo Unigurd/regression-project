@@ -295,7 +295,7 @@ table1 <- framingham4 |>
     arrange(desc(n_missing)) |>
     knitr::kable(digits=2)
 
-cat(table1, file="resources/table1")
+cat(table1, file="resources/table1.txt", sep="\n")
 
 ## Luckily the missing CIGPDAY and BMI consist of less than 0.001 of
 ## the data, so it doesn't matter much what we do with them. Let's
@@ -507,7 +507,7 @@ table2 <- drop1(model1, test="LRT") |>
     select(-AIC) |>
     knitr::kable(digits=2)
 
-cat(table2, file="resources/table2")
+cat(table2, file="resources/table2.txt", sep="\n")
 
 ## We now show the MLEs of the parameters and their odds-ratios along
 ## with 95% confidence intervals of them. The odds-ratios of PREVMI
@@ -538,7 +538,7 @@ table3 <- tidy(model1, conf.int=TRUE)[-1, c("term", "conf.low", "estimate", "con
     relocate(estimate, .after=`estimate 2.5%`) |>
     knitr::kable(digits=2)
 
-cat(table3, file="resources/table3")
+cat(table3, file="resources/table3.txt", sep="\n")
 
 ## Our model is overall very well calibrated although we overpredict
 ## in the right tail. Considering how relatively few observations
@@ -748,7 +748,7 @@ ggsave("resources/resid2.pdf", p23, width=5000, height=2000, units="px")
 ## both models are worse at explaining.
 table4 <- anova(model1, model2, test="LRT") |> knitr::kable(digits=2)
 
-cat(table4, file="resources/table4")
+cat(table4, file="resources/table4.txt", sep="\n")
 
 ## Examining the splined variables with an LRT test, we see that the
 ## p-value for both BMI and SYSBP got worse, while GLUCOSE got better
@@ -762,7 +762,7 @@ table5 <- drop1(model2, test="LRT") |>
     select(-AIC) |>
     knitr::kable(digits=2)
 
-cat(table5, file="resources/table5")
+cat(table5, file="resources/table5.txt", sep="\n")
 
 ## The calibration plots of the new model looks similar to the plots
 ## for the additive model and so we don't show them. But now we have
@@ -954,8 +954,8 @@ table7 <- drop1(model3, test="LRT") |>
     select(-AIC)
 
 
-cat(table6, file="resources/table6")
-cat(table7, file="resources/table7")
+cat(table6, file="resources/table6.txt", sep="\n")
+cat(table7, file="resources/table7.txt", sep="\n")
 
 
 ## But looking at the odds-ratios, we now see an extreme OR for plain
@@ -980,7 +980,7 @@ table8 <- tidy(model3, conf.int=TRUE)[-1, c("term", "conf.low", "estimate", "con
     relocate(estimate, .after=`estimate 2.5%`) |>
     knitr::kable(digits=2)
 
-cat(table8, file="resources/table8")
+cat(table8, file="resources/table8.txt", sep="\n")
 
 ## We do see the left tail of GLUCOSE going up a bit, but not as much
 ## as the observed mean or it did in model 2. It goes up too much for
@@ -1034,7 +1034,7 @@ model4 <- fit.mult.impute(
 ## interaction model.
 table9 <- anova(model4, model1, test="LRT") |> knitr::kable(digits=2)
 
-cat(table9, file="resources/table9")
+cat(table9, file="resources/table9.txt", sep="\n")
 
 
 cv3 <- cv(form3, framingham4, 10, 10, family=binomial(link=logit), loss=dev.res.sq)
@@ -1048,7 +1048,7 @@ errors_df <- data.frame(CV=c(cv1,cv2,cv3,cv4), ISE=c(ise1, ise2, ise3, ise4), AU
 rownames(errors_df) <- c("Additive", "Splines", "Interactions", "Fewer variables")
 table10 <- errors_df |> knitr::kable(digits=2)
 
-cat(table10, file="resources/table10")
+cat(table10, file="resources/table10.txt", sep="\n")
 
 
 
