@@ -981,6 +981,48 @@ model3 <- fit.mult.impute(
     imp, data=framingham4)
 ## END model3
 
+## The estimate of the dispersion is still close to 1, and the
+## residual plots look pretty indistinguishable from the first ones.
+model3_diag <- augment(model3, type.residuals = "pearson") |>
+    mutate(.fitted_group = cut(.fitted, quantile(.fitted, probs = seq(5, 95, 1) / 100)))
+
+model3_diag$.resid^2 |> sum() / df.residual(model3)
+
+p32 <- model3_diag |>
+    ggplot(aes(.fitted, .resid)) +
+    geom_point(alpha=0.5) +
+    geom_smooth(method="loess") +
+    xlab("fitted values") +
+    ylab("Pearson residuals")
+
+p33 <- model3_diag |>
+    ggplot(aes(TOTCHOL, .resid)) +
+    geom_point(alpha=0.5) +
+    geom_smooth(method="loess") +
+    ylab("Pearson residuals")
+
+p34 <- model3_diag |>
+    ggplot(aes(log(plotting_data$GLUCOSE), .resid)) +
+    geom_point(alpha=0.5) +
+    geom_smooth(method = "loess") +
+    ylab("Pearson residuals")
+
+p35 <- model3_diag |>
+    group_by(.fitted_group) |>
+    summarize(.fitted_local = mean(.fitted), .var_local = var(.resid)) |>
+    na.omit() |>
+    ggplot(aes(.fitted_local, .var_local)) +
+    geom_point() +
+    geom_hline(yintercept = 1, linetype = 2) +
+    geom_smooth(method="loess") +
+    xlab("fitted values") +
+    ylab("variance")
+
+p36 <- gridExtra::grid.arrange(p32, p33, p34, p35, ncol = 4)
+
+
+p29 <- cal_plot + group_p(as.numeric(plotting_data$CVD)-1, fitted(model2))
+
 
 ## The model diagnostics look just fine again, so we examine p-values.
 ## We see on the p-value from the LRT test that the interaction model
