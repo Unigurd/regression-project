@@ -505,6 +505,7 @@ table2 <- drop1(model1, test="LRT") |>
     filter(term != "<none>") |>
     arrange(p.value, desc(LRT)) |>
     select(-AIC) |>
+    mutate(p.value=as.character(signif(p.value, 3))) |>
     knitr::kable(digits=2)
 
 cat(table2, file="resources/table2.txt", sep="\n")
