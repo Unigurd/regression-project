@@ -817,16 +817,12 @@ cv <- function(form, data, k, m, family, loss) {
         muhat <- list()
         groups <- sample(rep(1:k, length.out=n))
         for (i in seq(k)) {
-            ## TODO: Ensure all missings in train_data is present in val_data
-            ## Preferably not in the same row.
             val_data   <- data[groups == i,]
             train_data <- data[groups != i,]
-            train_imp <- aregImpute(
-                impute_form,
-                train_data,
-                n.impute=5,
-                nk=4
-            )
+            ## There needs to be a case of PREVSTRK
+            ## Every time we train the data so we add one.
+            train_data[1,"PREVSTRK"] <- "1"
+            train_imp <- aregImpute(impute_form, train_data, n.impute=5, nk=4)
             model <- fit.mult.impute(
                 form,
                 function(formula, data){glm(formula, data, family=binomial(link=logit))},
