@@ -404,11 +404,9 @@ ggsave("resources/imputed-glucose.pdf", p9, width=5000, height=2000, units="px")
 form1  <- CVD ~ SEX + AGE + SYSBP + TOTCHOL +
     PREVMI + DIABETES + PREVHYP + log(HEARTRTE) + CIGPDAY +
     log(BMI) + educ + log(GLUCOSE) + PREVAP + BPMEDS + PREVSTRK
-
 model1 <- fit.mult.impute(
     form1, function(formula, data){glm(formula, data, family=binomial(link=logit))},
-    imp, data=framingham4
-)
+    imp, data=framingham4)
 ## END model1
 
 
@@ -707,11 +705,8 @@ form2  <- CVD ~ SEX + AGE +
     ns(log(GLUCOSE), knots=knots_log_gluc, Boundary.knots=bnds_log_gluc) +
     educ + PREVSTRK + PREVAP + BPMEDS
 model2 <- fit.mult.impute(
-    form2,
-    function(formula, data){glm(formula, data, family=binomial(link=logit))},
-    imp,
-    data=framingham4
-)
+    form2, function(formula, data){glm(formula, data, family=binomial(link=logit))},
+    imp, data=framingham4)
 ## END model2
 
 
@@ -813,9 +808,7 @@ cat(table5.5, file="resources/table5.5.txt", sep="\n")
 ## START cv
 ## This function is used to make sure we don't take the logarithm of 0.
 avoid0 <- function(n, epsilon=0.000000000000001) {
-    ifelse(n == 0, n + epsilon, ifelse(n == 1, n - epsilon, n)
-    )
-}
+    ifelse(n == 0, n + epsilon, ifelse(n == 1, n - epsilon, n))}
 
 ## Squared deviance residuals
 ## Uses GA3
@@ -843,19 +836,11 @@ cv <- function(form, data, k, m, family, loss) {
             train_data[1,"PREVSTRK"] <- "1"
             train_imp <- aregImpute(impute_form, train_data, n.impute=5, nk=4)
             model <- fit.mult.impute(
-                form,
-                function(formula, data){glm(formula, data, family=binomial(link=logit))},
-                train_imp,
-                data=train_data
-            )
+                form, function(formula, data){glm(formula, data, family=binomial(link=logit))},
+                train_imp, data=train_data)
             imputed_val_data <- impute.transcan(
-                train_imp,
-                data=train_data,
-                newdata=val_data,
-                imputation=(((b-1)*k+i)%%5)+1,
-                list.out=TRUE,
-                pr=FALSE
-            )
+                train_imp, data=train_data, newdata=val_data,
+                imputation=(((b-1)*k+i)%%5)+1, list.out=TRUE, pr=FALSE)
             muhat <- predict(model, newdata=imputed_val_data, type="response")
             losses[[(b-1)*k+i]] <- loss(imputed_val_data, muhat)
         }
@@ -972,11 +957,8 @@ form3  <- CVD ~ DIABETES * log(BMI) * log(GLUCOSE)  * CIGPDAY +
     PREVMI + log(HEARTRTE) +
     PREVSTRK + PREVAP
 model3 <- fit.mult.impute(
-    form3,
-    function(formula, data){glm(formula, data, family=binomial(link=logit))},
-    imp,
-    data=framingham4
-)
+    form3, function(formula, data){glm(formula, data, family=binomial(link=logit))},
+    imp, data=framingham4)
 ## END model3
 
 
@@ -1071,11 +1053,8 @@ ggsave("resources/cal3.pdf", p29, width=5000, height=2000, units="px")
 ## START model4
 form4  <- CVD ~ AGE + SEX + SYSBP + TOTCHOL + CIGPDAY * log(BMI) * log(GLUCOSE)
 model4 <- fit.mult.impute(
-    form4,
-    function(formula, data){glm(formula, data, family=binomial(link=logit))},
-    imp,
-    data=framingham4
-)
+    form4, function(formula, data){glm(formula, data, family=binomial(link=logit))},
+    imp, data=framingham4)
 ## END model4
 
 ## Unsurprisingly the additive model is very significant. Apart from
