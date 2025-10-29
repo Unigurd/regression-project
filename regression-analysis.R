@@ -381,7 +381,7 @@ imputed_glucose <- impute.all(impute_form, framingham4, "GLUCOSE", k=10)
 p9 <- gridExtra::grid.arrange(
                ggplot(mapping=aes(imputed_glucose[[1]])) + geom_density(fill=gray(0.7)),
                ggally_hexbin(
-                   cbind(GLUCOSE=imputed_glucose[[1]], HEARTRTE=framingham4$HEARTRTE),
+                   cbind(GLUCOSE=log(imputed_glucose[[1]]), HEARTRTE=framingham4$HEARTRTE),
                    aes(GLUCOSE, HEARTRTE)),
                ggplot(mapping=aes(
                           framingham4$GLUCOSE[!is.na(framingham4$GLUCOSE)],
