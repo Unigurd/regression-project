@@ -762,6 +762,9 @@ table5 <- drop1(model2, test="LRT") |>
     filter(term != "<none>") |>
     arrange(p.value, desc(LRT)) |>
     select(-AIC) |>
+    mutate(term=gsub("(,[^)]+)", "", term)) |>
+    mutate(p.value=as.character(signif(p.value, 3))) |>
+    filter(grepl("^ns", term)) |>
     knitr::kable(digits=2)
 
 cat(table5, file="resources/table5.txt", sep="\n")
