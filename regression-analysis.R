@@ -186,7 +186,7 @@ p4 <- GGally::ggpairs(
             diag  = list(continuous = "blankDiag")
         )
 
-ggsave("resources/corr-cont.pdf", p4, width=5000, height=2000, units="px")
+ggsave("resources/corr-cont.pdf", p4, width=2000, height=2000, units="px")
 
 ## Since all our categorical variables conveniently are ordered, we
 ## use the spearman correlation to get an idea of the correlation of
