@@ -167,7 +167,7 @@ p3 <- gridExtra::grid.arrange(
                bar1 + aes(educ),     bar1 + aes(PREVCHD),
                bar1 + aes(PREVAP),   bar1 + aes(PREVMI),
                bar1 + aes(PREVSTRK), bar1 + aes(PREVHYP),
-               bar1 + aes(CVD),      ncol=4
+               bar1 + aes(CVD), nrow=2
            )
 
 ggsave("resources/marg-factor.pdf", p3, width=5000, height=2000, units="px")
@@ -608,6 +608,8 @@ p16 <- cal_plot + group_p(as.numeric(plotting_data$CVD)-1, fitted(model1))
 
 ggsave("resources/cal1.pdf", p16, width=5000, height=2000, units="px")
 
+
+
 ## We also looked at our CVD predictions and the smoothed observed CVD
 ## means against various variables. The plot that stood out to us was
 ## the log(GLUCOSE) plot. The left tail of the observed means goes up
@@ -637,6 +639,7 @@ p17 <- gridExtra::grid.arrange(
     estimate_plot(model1_diag2, model1_diag2$`log(HEARTRTE)`, xlab="log(HEARTRTE)"),
     ncol=4)
 
+## High BMI goes down could be due to people dying or dropping out early?
 ggsave("resources/estim1.pdf", p17, width=5000, height=2000, units="px")
 
 ## To do this we make plots of how our model predicts on the median
