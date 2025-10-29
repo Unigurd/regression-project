@@ -1000,6 +1000,9 @@ table8 <- tidy(model3, conf.int=TRUE)[-1, c("term", "conf.low", "estimate", "con
         `estimate`      = NULL,
         ) |>
     ## relocate(estim., .after=`estim. 2.5%`) |>
+    mutate(term=gsub("\\.L", "", term)) |>
+    mutate(term=gsub("(log\\(([^)]*)\\))", "\\2", term)) |>
+    filter(grepl("DIABETES|BMI|GLUCOSE|CIGPDAY", term)) |>
     knitr::kable(digits=2)
 
 cat(table8, file="resources/table8.txt", sep="\n")
