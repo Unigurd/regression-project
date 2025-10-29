@@ -437,17 +437,17 @@ model1_diag <- augment(model1, type.residuals = "pearson") |>
 
 p10 <- model1_diag |>
     ggplot(aes(.fitted, .resid)) +
-    geom_point(alpha=0.5) + geom_smooth() +
+    geom_point(alpha=0.5) + geom_smooth(method="loess") +
     xlab("fitted values") + ylab("Pearson residuals")
 
 p11 <- model1_diag |>
     ggplot(aes(AGE, .resid)) +
-    geom_point(alpha=0.5) + geom_smooth() +
+    geom_point(alpha=0.5) + geom_smooth(method="loess") +
     ylab("Pearson residuals")
 
 p12 <- model1_diag |>
     ggplot(aes(`log(GLUCOSE)`, .resid)) +
-    geom_point(alpha=0.5) + geom_smooth(method = "lm") +
+    geom_point(alpha=0.5) + geom_smooth(method = "loess") +
     ylab("Pearson residuals")
 
 p13 <- model1_diag |>
@@ -457,7 +457,7 @@ p13 <- model1_diag |>
     ggplot(aes(.fitted_local, .var_local)) +
     geom_point() +
     geom_hline(yintercept = 1, linetype = 2) +
-    geom_smooth() +
+    geom_smooth(method="loess") +
     xlab("fitted values") +
     ylab("variance")
 
@@ -735,20 +735,20 @@ model2_diag$.resid^2 |> sum() / df.residual(model2)
 p19 <- model2_diag |>
     ggplot(aes(.fitted, .resid)) +
     geom_point(alpha=0.5) +
-    geom_smooth() +
+    geom_smooth(method="loess") +
     xlab("fitted values") +
     ylab("Pearson residuals")
 
 p20 <- model2_diag |>
     ggplot(aes(TOTCHOL, .resid)) +
     geom_point(alpha=0.5) +
-    geom_smooth() +
+    geom_smooth(method="loess") +
     ylab("Pearson residuals")
 
 p21 <- model2_diag |>
     ggplot(aes(log(plotting_data$GLUCOSE), .resid)) +
     geom_point(alpha=0.5) +
-    geom_smooth(method = "lm") +
+    geom_smooth(method = "loess") +
     ylab("Pearson residuals")
 
 p22 <- model2_diag |>
@@ -758,7 +758,7 @@ p22 <- model2_diag |>
     ggplot(aes(.fitted_local, .var_local)) +
     geom_point() +
     geom_hline(yintercept = 1, linetype = 2) +
-    geom_smooth() +
+    geom_smooth(method="loess") +
     xlab("fitted values") +
     ylab("variance")
 
