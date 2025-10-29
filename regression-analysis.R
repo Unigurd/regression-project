@@ -1,3 +1,4 @@
+## START import
 library(splines)
 library(Hmisc)
 library(tibble)
@@ -8,6 +9,8 @@ library(dplyr)
 library(tidyr)
 library(hexbin)
 library(ggplot2)
+## END import
+
 
 library(riskCommunicator)
 data(framingham, package="riskCommunicator")
@@ -319,11 +322,13 @@ round(sweep(cona4, 1, diag(cona4), "/"), 2)
 ## imputation means it imputes multiple complete data sets and we're
 ## then to impute our model to all of those data sets using
 ## fit.mult.impute from the same package.
+## START impute
 impute_form <- reformM(
     ~ CVD + SEX + TOTCHOL + AGE + SYSBP + CIGPDAY + DIABETES + HEARTRTE + PREVAP +
         PREVMI + PREVSTRK + PREVHYP + BMI + BPMEDS + GLUCOSE + educ, framingham4
 )
 imp <- aregImpute(impute_form, framingham4, n.impute=14, nk=4)
+## END impute
 
 ## We pick the first imputed data set arbitrarily to use for plotting.
 plotting_data <- as_tibble(impute.transcan(
@@ -339,6 +344,7 @@ plotting_data <- as_tibble(impute.transcan(
 ## values. We do this by repeatedly removing a fraction of the values
 ## and then imputing them, finally gathering these fractions into a
 ## fully imputed vector of values. Quite like K-fold cross-validation.
+## START impute.all
 impute.all <- function(form, data, var, k, n.impute=5, nk=4) {
     n <- nrow(data)
     imputed <- list()
@@ -367,6 +373,7 @@ impute.all <- function(form, data, var, k, n.impute=5, nk=4) {
     imputed
 }
 imputed_glucose <- impute.all(impute_form, framingham4, "GLUCOSE", k=10)
+## END impute.all
 
 ## To check our imputed values we plotted the marginal densities of
 ## the imputed values, the collinearities between imputed values and
@@ -393,6 +400,7 @@ ggsave("resources/imputed-glucose.pdf", p9, width=5000, height=2000, units="px")
 
 ## Our first model will be an additive logistic one with all the
 ## predictors we didn't find any reason to remove.
+## START model1
 form1  <- CVD ~ SEX + AGE + SYSBP + TOTCHOL +
     PREVMI + DIABETES + PREVHYP + log(HEARTRTE) + CIGPDAY +
     log(BMI) + educ + log(GLUCOSE) + PREVAP + BPMEDS + PREVSTRK
@@ -401,6 +409,7 @@ model1 <- fit.mult.impute(
     form1, function(formula, data){glm(formula, data, family=binomial(link=logit))},
     imp, data=framingham4
 )
+## END model1
 
 
 ## To assess the model fit we do the usual residual plots. We use the
@@ -450,6 +459,7 @@ ggsave("resources/resid1.pdf", p14, width=5000, height=2000, units="px")
 ## not see this in the above plot, so we simulate from our model and
 ## look at the variance plots.
 
+## START sim
 B <- 8
 sim_plots <- list()
 sims <- simulate(model1, nsim=B)
@@ -474,6 +484,7 @@ for (b in 1:B) {
         xlab("fitted values") +
         ylab("variance")
 }
+## END sim
 
 p15 <- gridExtra::grid.arrange(
     sim_plots[[1]], sim_plots[[2]], sim_plots[[3]], sim_plots[[4]],
@@ -494,7 +505,9 @@ ggsave("resources/simul.pdf", p15, width=5000, height=2000, units="px")
 ## whether our model is over/under-dispersed. It should be close to 1,
 ## and indeed it is. This means we can use the deviance test statistic
 ## rather than the F-test statistic.
+## START disp1
 model1_diag$.resid^2 |> sum() / df.residual(model1)
+## END disp1
 
 ## We check the significance of our predictors using likelihood-ratio
 ## tests assuming GA3. A lot of our predictors are very significant.
@@ -525,6 +538,7 @@ cat(table2, file="resources/table2.txt", sep="\n")
 ## interval. PREVMI has a large OR too, as would be expected, but
 ## nowhere near as dramatic and it does not include 1 in the
 ## confidence interval.
+## START OR1
 table3 <- tidy(model1, conf.int=TRUE)[-1, c("term", "conf.low", "estimate", "conf.high")] |>
     arrange(estimate) |>
     mutate(
@@ -538,6 +552,7 @@ table3 <- tidy(model1, conf.int=TRUE)[-1, c("term", "conf.low", "estimate", "con
         ) |>
     relocate(estimate, .after=`estimate 2.5%`) |>
     knitr::kable(digits=2)
+## END OR1
 
 cat(table3, file="resources/table3.txt", sep="\n")
 
@@ -678,6 +693,7 @@ ggsave("resources/median1.pdf", p18, width=5000, height=2000, units="px")
 ## with that, so instead we placed two knots: one at the 33th
 ## percentile and one at the 67th percentile. This is probably enough
 ## freedom to allow the bend to bend, if it exists at all.
+## START model2
 knots_sysbp    <- as.vector(quantile(framingham4$SYSBP,        probs=c(0.33,0.67), na.rm=1))
 knots_log_bmi  <- as.vector(quantile(log(framingham4$BMI),     probs=c(0.33,0.67), na.rm=1))
 knots_log_gluc <- as.vector(quantile(log(framingham4$GLUCOSE), probs=c(0.33,0.67), na.rm=1))
@@ -696,6 +712,7 @@ model2 <- fit.mult.impute(
     imp,
     data=framingham4
 )
+## END model2
 
 
 ## The estimate of the dispersion is still close to 1, and the
@@ -792,6 +809,8 @@ cat(table5.5, file="resources/table5.5.txt", sep="\n")
 ## for the additive model and so we don't show them. But now we have
 ## two models we can compare their predictive power!
 
+
+## START cv
 ## This function is used to make sure we don't take the logarithm of 0.
 avoid0 <- function(n, epsilon=0.000000000000001) {
     ifelse(n == 0, n + epsilon, ifelse(n == 1, n - epsilon, n)
@@ -846,6 +865,7 @@ cv <- function(form, data, k, m, family, loss) {
 
 cv1 <- cv(form1, framingham4, 10, 10, family=binomial(link=logit), loss=dev.res.sq)
 cv2 <- cv(form2, framingham4, 10, 10, family=binomial(link=logit), loss=dev.res.sq)
+## END cv
 
 
 ## TODO: write this based on actual computations
@@ -858,6 +878,7 @@ cv2 <- cv(form2, framingham4, 10, 10, family=binomial(link=logit), loss=dev.res.
 ## degrees of freedom rather than the effective degrees of freedom, so
 ## we omit that.
 
+## START pred-error
 train.error <- function(model, loss) {
     sum(loss(model$data, fitted(model)))/nrow(model$data)
 }
@@ -885,6 +906,7 @@ ise1 <- in_sample_error(model1)
 ise2 <- in_sample_error(model2)
 auc1 <- auc(model1)
 auc2 <- auc(model2)
+## END pred-error
 
 ## The in-sample error estimates are remarkably similar, suggesting
 ## that either model generalizes equally well. The auc is slightly
@@ -942,6 +964,7 @@ ggsave("resources/int-expl.pdf", p26, width=5000, height=2000, units="px")
 ## throw in an interaction between educ and SEX just because we
 ## noticed how the mean of CVD goes up again for men in educ groups 3
 ## and 4 but not for women in those groups. Let's get modeling!
+## START model3
 form3  <- CVD ~ DIABETES * log(BMI) * log(GLUCOSE)  * CIGPDAY +
     AGE + SEX * educ +
     BPMEDS + PREVHYP +
@@ -954,6 +977,7 @@ model3 <- fit.mult.impute(
     imp,
     data=framingham4
 )
+## END model3
 
 
 ## The model diagnostics look just fine again, so we examine p-values.
@@ -1044,6 +1068,7 @@ ggsave("resources/cal3.pdf", p29, width=5000, height=2000, units="px")
 ## on in the process. We've have included most of the interaction from
 ## the previous model, omitting DIABETES since we believe it made the
 ## odds-ratios crazy.
+## START model4
 form4  <- CVD ~ AGE + SEX + SYSBP + TOTCHOL + CIGPDAY * log(BMI) * log(GLUCOSE)
 model4 <- fit.mult.impute(
     form4,
@@ -1051,6 +1076,7 @@ model4 <- fit.mult.impute(
     imp,
     data=framingham4
 )
+## END model4
 
 ## Unsurprisingly the additive model is very significant. Apart from
 ## this the model behaves pretty sane. Perfectly fine residuals, much
