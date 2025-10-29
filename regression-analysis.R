@@ -1071,7 +1071,7 @@ auc4 <- auc(model4)
 
 errors_df <- data.frame(CV=c(cv1,cv2,cv3,cv4), ISE=c(ise1, ise2, ise3, ise4), AUC=c(auc1, auc2, auc3, auc4))
 rownames(errors_df) <- c("Additive", "Splines", "Interactions", "Fewer variables")
-table10 <- errors_df |> knitr::kable(digits=2)
+table10 <- errors_df |> knitr::kable(digits=3)
 
 cat(table10, file="resources/table10.txt", sep="\n")
 
