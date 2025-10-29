@@ -106,6 +106,13 @@ framingham3 <- framingham2 |>
     subset(select=-c(max, timeap, timemi, timemifc, timechd, timestrk, timecvd, timehyp))
 framingham4 <- framingham3 |> filter(time_censor > 12*365.25)
 
+## Rename to framingham5
+## Remove observations where TIMECVD == 0?
+## Understand the high correlation between PREVCHD and PREVAP again
+framingham4 <- framingham4 |> filter(PREVSTRK == 0 | is.na(PREVSTRK), PREVMI == 0 | is.na(PREVSTRK), BMI < 55 | is.na(BMI))
+
+
+
 ## We're now ready to examine the marginal distributions of the
 ## continuous variables:
 dens1 <- ggplot(data=framingham4) + geom_density(fill=gray(0.7))
@@ -205,8 +212,12 @@ pdf("resources/corr-all.pdf")
 cp <- cor(
     framingham4_log |> select(AGE, TOTCHOL, `log(SYSBP)`, `log(DIABP)`,
                               CIGPDAY, `log(BMI)`, HEARTRTE, `log(GLUCOSE)`,
-                              SEX, CURSMOKE, DIABETES, BPMEDS, educ, PREVCHD,
-                              PREVAP, PREVMI, PREVSTRK, PREVHYP, CVD)
+                              SEX, CURSMOKE, DIABETES, BPMEDS, educ,
+                              PREVCHD,
+                              PREVAP,
+                              ## PREVMI, PREVSTRK,
+                              PREVHYP , CVD
+                              )
     |> data.matrix(),
     use    = "complete.obs",
     method = "spearman"
@@ -325,7 +336,8 @@ round(sweep(cona4, 1, diag(cona4), "/"), 2)
 ## START impute
 impute_form <- reformM(
     ~ CVD + SEX + TOTCHOL + AGE + SYSBP + CIGPDAY + DIABETES + HEARTRTE + PREVAP +
-        PREVMI + PREVSTRK + PREVHYP + BMI + BPMEDS + GLUCOSE + educ, framingham4
+        ## PREVMI + PREVSTRK +
+        PREVHYP + BMI + BPMEDS + GLUCOSE + educ, framingham4
 )
 imp <- aregImpute(impute_form, framingham4, n.impute=14, nk=4)
 ## END impute
@@ -402,8 +414,9 @@ ggsave("resources/imputed-glucose.pdf", p9, width=5000, height=2000, units="px")
 ## predictors we didn't find any reason to remove.
 ## START model1
 form1  <- CVD ~ SEX + AGE + SYSBP + TOTCHOL +
-    PREVMI + DIABETES + PREVHYP + log(HEARTRTE) + CIGPDAY +
-    log(BMI) + educ + log(GLUCOSE) + PREVAP + BPMEDS + PREVSTRK
+    # PREVMI +
+    DIABETES + PREVHYP + log(HEARTRTE) + CIGPDAY +
+    log(BMI) + educ + log(GLUCOSE) + BPMEDS + PREVAP # + PREVSTRK
 model1 <- fit.mult.impute(
     form1, function(formula, data){glm(formula, data, family=binomial(link=logit))},
     imp, data=framingham4)
@@ -700,10 +713,12 @@ bnds_log_bmi   <- range(log(framingham4$BMI),     na.rm=1)
 bnds_log_gluc  <- range(log(framingham4$GLUCOSE), na.rm=1)
 form2  <- CVD ~ SEX + AGE +
     ns(SYSBP, knots=knots_sysbp, Boundary.knots=bnds_sysbp) +
-    TOTCHOL + PREVMI + DIABETES + PREVHYP + log(HEARTRTE) + CIGPDAY +
+    TOTCHOL + # PREVMI +
+    DIABETES + PREVHYP + log(HEARTRTE) + CIGPDAY +
     ns(log(BMI), knots=knots_log_bmi, Boundary.knots=bnds_log_bmi) +
     ns(log(GLUCOSE), knots=knots_log_gluc, Boundary.knots=bnds_log_gluc) +
-    educ + PREVSTRK + PREVAP + BPMEDS
+    educ + #PREVSTRK +
+    PREVAP + BPMEDS
 model2 <- fit.mult.impute(
     form2, function(formula, data){glm(formula, data, family=binomial(link=logit))},
     imp, data=framingham4)
@@ -954,8 +969,10 @@ form3  <- CVD ~ DIABETES * log(BMI) * log(GLUCOSE)  * CIGPDAY +
     AGE + SEX * educ +
     BPMEDS + PREVHYP +
     SYSBP + TOTCHOL +
-    PREVMI + log(HEARTRTE) +
-    PREVSTRK + PREVAP
+    # PREVMI +
+    log(HEARTRTE) +
+    # PREVSTRK +
+    PREVAP
 model3 <- fit.mult.impute(
     form3, function(formula, data){glm(formula, data, family=binomial(link=logit))},
     imp, data=framingham4)
